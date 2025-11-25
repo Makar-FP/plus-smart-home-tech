@@ -3,7 +3,10 @@ package ru.yandex.practicum.telemetry.aggregator.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.specific.SpecificRecordBase;
-import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
@@ -23,6 +26,7 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 public class SensorSnapshotAggregator {
+
     private final EventClient client;
     private final InMemorySensorEvent service;
 
@@ -34,16 +38,34 @@ public class SensorSnapshotAggregator {
         try {
             consumer.subscribe(List.of(EventTopic.TELEMETRY_SENSOR_TOPIC));
 
-            long processedCount = 0L;
+            int count = 0;
 
             while (true) {
                 ConsumerRecords<String, SpecificRecordBase> records =
                         consumer.poll(Duration.ofMillis(100));
 
                 for (ConsumerRecord<String, SpecificRecordBase> record : records) {
-                    processRecord(record);
-                    manageOffsets(record, processedCount, consumer);
-                    processedCount++;
+                    log.info("Updating snapshot...");
+                    Optional<SensorsSnapshotAvro> snapshotAvro =
+                            service.updateState((SensorEventAvro) record.value());
+
+                    if (snapshotAvro.isEmpty()) {
+                        log.info("Snapshot was not updated (no changes detected).");
+                    } else {
+                        SensorsSnapshotAvro snapshot = snapshotAvro.get();
+                        log.info("New snapshot: {}", snapshot);
+
+                        ProducerRecord<String, SpecificRecordBase> snapshotRecord =
+                                new ProducerRecord<>(EventTopic.TELEMETRY_SNAPSHOT_TOPIC, snapshot);
+
+                        client.getProducer().send(snapshotRecord);
+                        log.info("Snapshot sent to topic {}", EventTopic.TELEMETRY_SNAPSHOT_TOPIC);
+                    }
+
+                    log.debug("... start manageOffsets");
+                    manageOffsets(record, count, consumer);
+                    count++;
+                    log.debug("... stop manageOffsets");
                 }
 
                 consumer.commitAsync();
@@ -64,36 +86,8 @@ public class SensorSnapshotAggregator {
         }
     }
 
-    private void processRecord(ConsumerRecord<String, SpecificRecordBase> record) {
-        log.info("Updating snapshot for sensor event, topic={}, partition={}, offset={}",
-                record.topic(), record.partition(), record.offset());
-
-        SensorEventAvro event = (SensorEventAvro) record.value();
-        Optional<SensorsSnapshotAvro> snapshotAvro = service.updateState(event);
-
-        if (snapshotAvro.isEmpty()) {
-            log.debug("Snapshot was not updated (no changes detected).");
-            return;
-        }
-
-        SensorsSnapshotAvro snapshot = snapshotAvro.get();
-        log.info("New snapshot created/updated: {}", snapshot);
-
-        ProducerRecord<String, SpecificRecordBase> snapshotRecord =
-                new ProducerRecord<>(EventTopic.TELEMETRY_SNAPSHOT_TOPIC, snapshot);
-
-        client.getProducer().send(snapshotRecord, (metadata, exception) -> {
-            if (exception != null) {
-                log.error("Failed to send snapshot to topic {}", EventTopic.TELEMETRY_SNAPSHOT_TOPIC, exception);
-            } else {
-                log.info("Snapshot sent to topic {}, partition={}, offset={}",
-                        metadata.topic(), metadata.partition(), metadata.offset());
-            }
-        });
-    }
-
     private void manageOffsets(ConsumerRecord<String, SpecificRecordBase> record,
-                               long count,
+                               int count,
                                Consumer<String, SpecificRecordBase> consumer) {
         currentOffsets.put(
                 new TopicPartition(record.topic(), record.partition()),

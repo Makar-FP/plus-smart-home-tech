@@ -6,7 +6,10 @@ import ru.yandex.practicum.kafka.telemetry.event.SensorEventAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorStateAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -16,76 +19,70 @@ public class InMemorySensorEvent {
     private final Map<String, SensorsSnapshotAvro> snapshots = new ConcurrentHashMap<>();
 
     public Optional<SensorsSnapshotAvro> updateState(SensorEventAvro event) {
-        log.debug("Snapshots map: {}", snapshots);
         String hubId = event.getHubId();
         String sensorId = event.getId();
 
+        log.debug("Updating snapshot for hubId={}, sensorId={}", hubId, sensorId);
+
         SensorsSnapshotAvro snapshot = snapshots.get(hubId);
-        if (snapshot != null) {
-            log.debug("Snapshot found for hubId={}", hubId);
-
-            SensorStateAvro oldState = snapshot.getSensorsState().get(sensorId);
-            if (oldState != null) {
-                log.debug("Previous state found for sensorId={}: {}", sensorId, oldState);
-
-                boolean timestampIsNewer =
-                        event.getTimestamp().isAfter(oldState.getTimestamp());
-                boolean dataEquals = Objects.equals(oldState.getData(), event.getPayload());
-
-                if (!timestampIsNewer || dataEquals) {
-                    log.debug("Previous state is newer or unchanged. Snapshot will not be updated.");
-                    return Optional.empty();
-                }
-
-                SensorStateAvro newState = SensorStateAvro.newBuilder()
-                        .setTimestamp(event.getTimestamp())
-                        .setData(event.getPayload())
-                        .build();
-
-                snapshot.setTimestamp(event.getTimestamp());
-                snapshot.getSensorsState().put(sensorId, newState);
-                log.debug("Updated snapshot: {}", snapshot);
-
-                return Optional.of(snapshot);
-            } else {
-                log.debug("No previous state for sensorId={}, adding new state", sensorId);
-                SensorStateAvro newState = SensorStateAvro.newBuilder()
-                        .setTimestamp(event.getTimestamp())
-                        .setData(event.getPayload())
-                        .build();
-
-                snapshot.setTimestamp(event.getTimestamp());
-                snapshot.getSensorsState().put(sensorId, newState);
-                log.debug("Updated snapshot with new sensor state: {}", snapshot);
-
-                return Optional.of(snapshot);
-            }
+        if (snapshot == null) {
+            SensorsSnapshotAvro newSnapshot = addSnapshot(event);
+            snapshots.put(hubId, newSnapshot);
+            log.debug("Created new snapshot for hubId={}: {}", hubId, newSnapshot);
+            return Optional.of(newSnapshot);
         }
 
-        log.debug("No snapshot for hubId={}, creating new", hubId);
-        SensorsSnapshotAvro newSnapshot = addSnapshot(event);
-        return Optional.of(newSnapshot);
+        Map<String, SensorStateAvro> sensorsState = snapshot.getSensorsState();
+        SensorStateAvro oldState = sensorsState.get(sensorId);
+
+        if (oldState == null) {
+            SensorStateAvro newState = toState(event);
+            snapshot.setTimestamp(event.getTimestamp());
+            sensorsState.put(sensorId, newState);
+            log.debug("Added new sensor state for hubId={}, sensorId={}: {}", hubId, sensorId, newState);
+            return Optional.of(snapshot);
+        }
+
+        log.debug("Existing state for hubId={}, sensorId={}: {}", hubId, sensorId, oldState);
+        log.debug("Comparing timestamps: old={} vs new={}", oldState.getTimestamp(), event.getTimestamp());
+
+        boolean isNewer = event.getTimestamp().isAfter(oldState.getTimestamp());
+        boolean dataChanged = !Objects.equals(oldState.getData(), event.getPayload());
+
+        log.debug("Data compare for sensorId={}: old={}, new={}, isNewer={}, dataChanged={}",
+                sensorId, oldState.getData(), event.getPayload(), isNewer, dataChanged);
+
+        if (!isNewer || !dataChanged) {
+            log.debug("Snapshot not updated for hubId={}, sensorId={} (no change detected)", hubId, sensorId);
+            return Optional.empty();
+        }
+
+        SensorStateAvro updatedState = toState(event);
+        snapshot.setTimestamp(event.getTimestamp());
+        sensorsState.put(sensorId, updatedState);
+
+        log.debug("Snapshot updated for hubId={}, sensorId={}: {}", hubId, sensorId, snapshot);
+        return Optional.of(snapshot);
     }
 
-    private SensorsSnapshotAvro addSnapshot(SensorEventAvro record) {
-        String hubId = record.getHubId();
+    private SensorsSnapshotAvro addSnapshot(SensorEventAvro event) {
+        String hubId = event.getHubId();
+        String sensorId = event.getId();
 
         Map<String, SensorStateAvro> sensorsState = new HashMap<>();
-        SensorStateAvro state = SensorStateAvro.newBuilder()
-                .setTimestamp(record.getTimestamp())
-                .setData(record.getPayload())
-                .build();
-        sensorsState.put(record.getId(), state);
+        sensorsState.put(sensorId, toState(event));
 
-        SensorsSnapshotAvro snapshot  = SensorsSnapshotAvro.newBuilder()
-                .setTimestamp(record.getTimestamp())
+        return SensorsSnapshotAvro.newBuilder()
+                .setTimestamp(event.getTimestamp())
                 .setHubId(hubId)
                 .setSensorsState(sensorsState)
                 .build();
+    }
 
-        snapshots.put(hubId, snapshot);
-        log.debug("New snapshot created for hubId={}: {}", hubId, snapshot);
-        return snapshot;
+    private SensorStateAvro toState(SensorEventAvro event) {
+        return SensorStateAvro.newBuilder()
+                .setTimestamp(event.getTimestamp())
+                .setData(event.getPayload())
+                .build();
     }
 }
-
