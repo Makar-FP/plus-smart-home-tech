@@ -29,10 +29,11 @@ public class EventAvroSerializer<T extends SpecificRecordBase> implements Serial
             encoder.flush();
 
             return out.toByteArray();
-        } catch (IOException ex) {
+        }  catch (IOException | RuntimeException ex) {
             String type = (data != null) ? data.getClass().getName() : "null";
             throw new SerializationException(
-                    "Error serializing the Avro message for the topic [" + topic + "], type="
+                    "Failed to serialize Avro message for topic [" + topic + "], type=[" + type + "]",
+                    ex
             );
         }
     }

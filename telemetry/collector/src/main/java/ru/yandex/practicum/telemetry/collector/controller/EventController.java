@@ -1,42 +1,38 @@
 package ru.yandex.practicum.telemetry.collector.controller;
 
-import jakarta.validation.Valid;
+import com.google.protobuf.Empty;
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
 import lombok.extern.slf4j.Slf4j;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-
-import ru.yandex.practicum.telemetry.collector.model.HubEvent;
-import ru.yandex.practicum.telemetry.collector.model.HubEventType;
-import ru.yandex.practicum.telemetry.collector.model.SensorEvent;
-import ru.yandex.practicum.telemetry.collector.model.SensorEventType;
+import net.devh.boot.grpc.server.service.GrpcService;
+import ru.yandex.practicum.grpc.telemetry.collector.CollectorControllerGrpc;
+import ru.yandex.practicum.grpc.telemetry.event.HubEventProto;
+import ru.yandex.practicum.grpc.telemetry.event.SensorEventProto;
 import ru.yandex.practicum.telemetry.collector.service.handler.HubEventHandler;
 import ru.yandex.practicum.telemetry.collector.service.handler.SensorEventHandler;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
-@Validated
-@RestController
-@RequestMapping("/events")
-public class EventController {
+@GrpcService
+public class EventController extends CollectorControllerGrpc.CollectorControllerImplBase {
 
-    private final Map<SensorEventType, SensorEventHandler> sensorEventHandlers;
-    private final Map<HubEventType, HubEventHandler> hubEventHandlers;
+    private final Map<SensorEventProto.PayloadCase, SensorEventHandler> sensorEventHandlers;
+    private final Map<HubEventProto.PayloadCase, HubEventHandler> hubEventHandlers;
 
     public EventController(Set<SensorEventHandler> sensorEventHandlers,
                            Set<HubEventHandler> hubEventHandlers) {
+
         this.sensorEventHandlers = sensorEventHandlers.stream()
                 .collect(Collectors.toUnmodifiableMap(
                         SensorEventHandler::getMessageType,
-                        handler -> handler,
+                        Function.identity(),
                         (h1, h2) -> {
                             throw new IllegalStateException(
-                                    "Найдено два SensorEventHandler для типа: " + h1.getMessageType()
+                                    "Multiple SensorEventHandler beans found for type: " + h1.getMessageType()
                             );
                         }
                 ));
@@ -44,50 +40,94 @@ public class EventController {
         this.hubEventHandlers = hubEventHandlers.stream()
                 .collect(Collectors.toUnmodifiableMap(
                         HubEventHandler::getMessageType,
-                        handler -> handler,
+                        Function.identity(),
                         (h1, h2) -> {
                             throw new IllegalStateException(
-                                    "Найдено два HubEventHandler для типа: " + h1.getMessageType()
+                                    "Multiple HubEventHandler beans found for type: " + h1.getMessageType()
                             );
                         }
                 ));
     }
 
-    @PostMapping("/sensors")
-    @ResponseStatus(HttpStatus.CREATED)
-    public void collectSensorEvent(@Valid @RequestBody SensorEvent request) {
-        log.info("POST /events/sensors, body={}", request);
+    @Override
+    public void collectSensorEvent(SensorEventProto request, StreamObserver<Empty> responseObserver) {
+        SensorEventProto.PayloadCase payloadCase = request.getPayloadCase();
+        log.info("gRPC collectSensorEvent, payloadCase={}", payloadCase);
 
-        SensorEventType type = request.getType();
-        SensorEventHandler handler = sensorEventHandlers.get(type);
-
-        if (handler == null) {
-            log.warn("Нет обработчика для типа сенсорного события: {}", type);
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Не найден обработчик для типа сенсорного события: " + type
+        if (payloadCase == SensorEventProto.PayloadCase.PAYLOAD_NOT_SET) {
+            log.warn("Sensor event payload is not set: request={}", request);
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT
+                            .withDescription("Sensor event payload must not be empty")
+                            .asRuntimeException()
             );
+            return;
         }
 
-        handler.handle(request);
+        SensorEventHandler handler = sensorEventHandlers.get(payloadCase);
+        if (handler == null) {
+            log.warn("No handler registered for sensor event payload type: {}", payloadCase);
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT
+                            .withDescription("No handler registered for sensor event payload type: " + payloadCase)
+                            .asRuntimeException()
+            );
+            return;
+        }
+
+        try {
+            handler.handle(request);
+            responseObserver.onNext(Empty.getDefaultInstance());
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("Failed to handle sensor event. payloadCase={}, request={}", payloadCase, request, e);
+            responseObserver.onError(
+                    Status.INTERNAL
+                            .withDescription("Internal error while processing sensor event")
+                            .withCause(e)
+                            .asRuntimeException()
+            );
+        }
     }
 
-    @PostMapping("/hubs")
-    @ResponseStatus(HttpStatus.CREATED)
-    public void collectHubEvent(@Valid @RequestBody HubEvent request) {
-        log.info("POST /events/hubs, body={}", request);
+    @Override
+    public void collectHubEvent(HubEventProto request, StreamObserver<Empty> responseObserver) {
+        HubEventProto.PayloadCase payloadCase = request.getPayloadCase();
+        log.info("gRPC collectHubEvent, payloadCase={}", payloadCase);
 
-        HubEventType type = request.getType();
-        HubEventHandler handler = hubEventHandlers.get(type);
-
-        if (handler == null) {
-            log.warn("Нет обработчика для типа события хаба: {}", type);
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Не найден обработчик для типа события хаба: " + type
+        if (payloadCase == HubEventProto.PayloadCase.PAYLOAD_NOT_SET) {
+            log.warn("Hub event payload is not set: request={}", request);
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT
+                            .withDescription("Hub event payload must not be empty")
+                            .asRuntimeException()
             );
+            return;
         }
 
-        handler.handle(request);
+        HubEventHandler handler = hubEventHandlers.get(payloadCase);
+        if (handler == null) {
+            log.warn("No handler registered for hub event payload type: {}", payloadCase);
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT
+                            .withDescription("No handler registered for hub event payload type: " + payloadCase)
+                            .asRuntimeException()
+            );
+            return;
+        }
+
+        try {
+            handler.handle(request);
+            responseObserver.onNext(Empty.getDefaultInstance());
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("Failed to handle hub event. payloadCase={}, request={}", payloadCase, request, e);
+            responseObserver.onError(
+                    Status.INTERNAL
+                            .withDescription("Internal error while processing hub event")
+                            .withCause(e)
+                            .asRuntimeException()
+            );
+        }
     }
 }
