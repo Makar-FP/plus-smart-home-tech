@@ -8,7 +8,6 @@ import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -26,40 +25,17 @@ public class InMemorySensorEvent {
 
         SensorsSnapshotAvro snapshot = snapshots.get(hubId);
         if (snapshot == null) {
-            SensorsSnapshotAvro newSnapshot = addSnapshot(event);
-            snapshots.put(hubId, newSnapshot);
-            log.debug("Created new snapshot for hubId={}: {}", hubId, newSnapshot);
-            return Optional.of(newSnapshot);
-        }
-
-        Map<String, SensorStateAvro> sensorsState = snapshot.getSensorsState();
-        SensorStateAvro oldState = sensorsState.get(sensorId);
-
-        if (oldState == null) {
-            SensorStateAvro newState = toState(event);
-            snapshot.setTimestamp(event.getTimestamp());
-            sensorsState.put(sensorId, newState);
-            log.debug("Added new sensor state for hubId={}, sensorId={}: {}", hubId, sensorId, newState);
+            snapshot = addSnapshot(event);
+            snapshots.put(hubId, snapshot);
+            log.debug("Created new snapshot for hubId={}: {}", hubId, snapshot);
             return Optional.of(snapshot);
         }
 
-        log.debug("Existing state for hubId={}, sensorId={}: {}", hubId, sensorId, oldState);
-        log.debug("Comparing timestamps: old={} vs new={}", oldState.getTimestamp(), event.getTimestamp());
+        Map<String, SensorStateAvro> sensorsState = snapshot.getSensorsState();
+        SensorStateAvro newState = toState(event);
 
-        boolean isNewer = event.getTimestamp().isAfter(oldState.getTimestamp());
-        boolean dataChanged = !Objects.equals(oldState.getData(), event.getPayload());
-
-        log.debug("Data compare for sensorId={}: old={}, new={}, isNewer={}, dataChanged={}",
-                sensorId, oldState.getData(), event.getPayload(), isNewer, dataChanged);
-
-        if (!isNewer || !dataChanged) {
-            log.debug("Snapshot not updated for hubId={}, sensorId={} (no change detected)", hubId, sensorId);
-            return Optional.empty();
-        }
-
-        SensorStateAvro updatedState = toState(event);
         snapshot.setTimestamp(event.getTimestamp());
-        sensorsState.put(sensorId, updatedState);
+        sensorsState.put(sensorId, newState);
 
         log.debug("Snapshot updated for hubId={}, sensorId={}: {}", hubId, sensorId, snapshot);
         return Optional.of(snapshot);
