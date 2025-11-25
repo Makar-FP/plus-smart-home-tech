@@ -8,6 +8,7 @@ import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,14 +26,32 @@ public class InMemorySensorEvent {
 
         SensorsSnapshotAvro snapshot = snapshots.get(hubId);
         if (snapshot == null) {
-            snapshot = addSnapshot(event);
+            snapshot = createSnapshot(event);
             snapshots.put(hubId, snapshot);
             log.debug("Created new snapshot for hubId={}: {}", hubId, snapshot);
             return Optional.of(snapshot);
         }
 
         Map<String, SensorStateAvro> sensorsState = snapshot.getSensorsState();
+        SensorStateAvro oldState = sensorsState.get(sensorId);
         SensorStateAvro newState = toState(event);
+
+        if (oldState == null) {
+            snapshot.setTimestamp(event.getTimestamp());
+            sensorsState.put(sensorId, newState);
+            log.debug("Added new sensor to snapshot for hubId={}, sensorId={}: {}",
+                    hubId, sensorId, snapshot);
+            return Optional.of(snapshot);
+        }
+
+        boolean isNewer = event.getTimestamp().isAfter(oldState.getTimestamp());
+        boolean dataChanged = !Objects.equals(oldState.getData(), event.getPayload());
+
+        if (!isNewer || !dataChanged) {
+            log.debug("Event ignored for hubId={}, sensorId={} (isNewer={}, dataChanged={})",
+                    hubId, sensorId, isNewer, dataChanged);
+            return Optional.empty();
+        }
 
         snapshot.setTimestamp(event.getTimestamp());
         sensorsState.put(sensorId, newState);
@@ -41,7 +60,7 @@ public class InMemorySensorEvent {
         return Optional.of(snapshot);
     }
 
-    private SensorsSnapshotAvro addSnapshot(SensorEventAvro event) {
+    private SensorsSnapshotAvro createSnapshot(SensorEventAvro event) {
         String hubId = event.getHubId();
         String sensorId = event.getId();
 

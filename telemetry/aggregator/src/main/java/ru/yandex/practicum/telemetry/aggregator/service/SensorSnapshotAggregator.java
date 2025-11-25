@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.specific.SpecificRecordBase;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
@@ -56,7 +56,11 @@ public class SensorSnapshotAggregator {
                         log.info("New snapshot: {}", snapshot);
 
                         ProducerRecord<String, SpecificRecordBase> snapshotRecord =
-                                new ProducerRecord<>(EventTopic.TELEMETRY_SNAPSHOT_TOPIC, snapshot);
+                                new ProducerRecord<>(
+                                        EventTopic.TELEMETRY_SNAPSHOT_TOPIC,
+                                        snapshot.getHubId(),
+                                        snapshot
+                                );
 
                         client.getProducer().send(snapshotRecord);
                         log.info("Snapshot sent to topic {}", EventTopic.TELEMETRY_SNAPSHOT_TOPIC);
