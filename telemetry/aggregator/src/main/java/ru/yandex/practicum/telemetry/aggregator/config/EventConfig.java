@@ -41,7 +41,7 @@ public class EventConfig {
                 config.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
                         "org.apache.kafka.common.serialization.StringDeserializer");
                 config.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                        "ru.yandex.practicum.telemetry.aggregator.configuration.SensorEventDeserializer");
+                        "ru.yandex.practicum.telemetry.aggregator.config.SensorEventDeserializer");
                 config.setProperty(ConsumerConfig.GROUP_ID_CONFIG,
                         "consumer-client-" + counter.getAndIncrement());
                 config.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "500");
@@ -63,7 +63,7 @@ public class EventConfig {
                 config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
                         "org.apache.kafka.common.serialization.StringSerializer");
                 config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
-                        "ru.yandex.practicum.telemetry.aggregator.configuration.EventAvroSerializer");
+                        "ru.yandex.practicum.telemetry.aggregator.config.EventAvroSerializer");
 
                 producer = new KafkaProducer<>(config);
             }
