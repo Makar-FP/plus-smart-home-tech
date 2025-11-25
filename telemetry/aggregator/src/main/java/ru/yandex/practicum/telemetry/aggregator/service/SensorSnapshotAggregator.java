@@ -9,7 +9,6 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.kafka.telemetry.event.SensorEventAvro;
-import ru.yandex.practicum.kafka.telemetry.event.SensorSnapshotAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
 import ru.yandex.practicum.telemetry.aggregator.config.EventClient;
 import ru.yandex.practicum.telemetry.aggregator.config.EventTopic;
