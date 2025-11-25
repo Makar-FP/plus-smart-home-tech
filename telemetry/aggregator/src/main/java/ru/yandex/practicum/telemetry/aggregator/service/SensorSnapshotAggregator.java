@@ -12,7 +12,6 @@ import ru.yandex.practicum.kafka.telemetry.event.SensorEventAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorSnapshotAvro;
 import ru.yandex.practicum.telemetry.aggregator.config.EventClient;
 import ru.yandex.practicum.telemetry.aggregator.config.EventTopic;
-import ru.yandex.practicum.telemetry.aggregator.repo.SensorSnapshotRepository;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -25,7 +24,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SensorSnapshotAggregator {
     private final EventClient client;
-    private final SensorSnapshotRepository repo;
+    private final InMemorySensorEvent service;
 
     private final Map<TopicPartition, OffsetAndMetadata> currentOffsets = new HashMap<>();
 
@@ -70,7 +69,7 @@ public class SensorSnapshotAggregator {
                 record.topic(), record.partition(), record.offset());
 
         SensorEventAvro event = (SensorEventAvro) record.value();
-        Optional<SensorSnapshotAvro> snapshotAvro = repo.updateSnapshot(event);
+        Optional<SensorSnapshotAvro> snapshotAvro = service.updateState(event);
 
         if (snapshotAvro.isEmpty()) {
             log.debug("Snapshot was not updated (no changes detected).");
