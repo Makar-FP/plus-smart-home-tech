@@ -1,13 +1,12 @@
 package ru.yandex.practicum.telemetry.collector.service.handler.sensor;
 
 import org.springframework.stereotype.Component;
-import ru.yandex.practicum.grpc.telemetry.event.ClimateSensorProto;
-import ru.yandex.practicum.grpc.telemetry.event.SensorEventProto;
 import ru.yandex.practicum.kafka.telemetry.event.ClimateSensorAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorEventAvro;
+import ru.yandex.practicum.telemetry.collector.model.ClimateSensorEvent;
+import ru.yandex.practicum.telemetry.collector.model.SensorEvent;
+import ru.yandex.practicum.telemetry.collector.model.SensorEventType;
 import ru.yandex.practicum.telemetry.collector.service.KafkaEventProducer;
-
-import java.time.Instant;
 
 @Component
 public class ClimateSensorEventHandler extends BaseSensorEventHandler {
@@ -17,27 +16,26 @@ public class ClimateSensorEventHandler extends BaseSensorEventHandler {
     }
 
     @Override
-    public SensorEventProto.PayloadCase getMessageType() {
-        return SensorEventProto.PayloadCase.CLIMATE_SENSOR_EVENT;
-    }
+    protected SensorEventAvro mapToAvro(SensorEvent event) {
+        ClimateSensorEvent record = (ClimateSensorEvent) event;
 
-    @Override
-    protected SensorEventAvro mapToAvro(SensorEventProto event) {
-        ClimateSensorProto record = event.getClimateSensorEvent();
-
-        ClimateSensorAvro csEvent = ClimateSensorAvro.newBuilder()
+        ClimateSensorAvro payload = ClimateSensorAvro.newBuilder()
                 .setTemperatureC(record.getTemperatureC())
                 .setCo2Level(record.getCo2Level())
                 .setHumidity(record.getHumidity())
                 .build();
 
         return SensorEventAvro.newBuilder()
-                .setId(event.getId())
-                .setHubId(event.getHubId())
-                .setTimestamp(Instant.ofEpochSecond(
-                        event.getTimestamp().getSeconds(),
-                        event.getTimestamp().getNanos()))
-                .setPayload(csEvent)
+                .setId(record.getId())
+                .setHubId(record.getHubId())
+                .setTimestamp(record.getTimestamp())
+                .setPayload(payload)
                 .build();
     }
+
+    @Override
+    public SensorEventType getMessageType() {
+        return SensorEventType.CLIMATE_SENSOR_EVENT;
+    }
 }
+

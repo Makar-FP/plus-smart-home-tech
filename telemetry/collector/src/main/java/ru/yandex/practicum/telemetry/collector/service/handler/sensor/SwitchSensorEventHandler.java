@@ -1,13 +1,12 @@
 package ru.yandex.practicum.telemetry.collector.service.handler.sensor;
 
 import org.springframework.stereotype.Component;
-import ru.yandex.practicum.grpc.telemetry.event.SensorEventProto;
-import ru.yandex.practicum.grpc.telemetry.event.SwitchSensorProto;
 import ru.yandex.practicum.kafka.telemetry.event.SensorEventAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SwitchSensorAvro;
+import ru.yandex.practicum.telemetry.collector.model.SensorEvent;
+import ru.yandex.practicum.telemetry.collector.model.SensorEventType;
+import ru.yandex.practicum.telemetry.collector.model.SwitchSensorEvent;
 import ru.yandex.practicum.telemetry.collector.service.KafkaEventProducer;
-
-import java.time.Instant;
 
 @Component
 public class SwitchSensorEventHandler extends BaseSensorEventHandler {
@@ -17,25 +16,24 @@ public class SwitchSensorEventHandler extends BaseSensorEventHandler {
     }
 
     @Override
-    public SensorEventProto.PayloadCase getMessageType() {
-        return SensorEventProto.PayloadCase.SWITCH_SENSOR_EVENT;
-    }
+    protected SensorEventAvro mapToAvro(SensorEvent event) {
+        SwitchSensorEvent record = (SwitchSensorEvent) event;
 
-    @Override
-    protected SensorEventAvro mapToAvro(SensorEventProto event) {
-        SwitchSensorProto record = event.getSwitchSensorEvent();
-
-        SwitchSensorAvro ssEvent = SwitchSensorAvro.newBuilder()
-                .setState(record.getState())
+        SwitchSensorAvro payload = SwitchSensorAvro.newBuilder()
+                .setState(record.isState())
                 .build();
 
         return SensorEventAvro.newBuilder()
-                .setId(event.getId())
-                .setHubId(event.getHubId())
-                .setTimestamp(Instant.ofEpochSecond(
-                        event.getTimestamp().getSeconds(),
-                        event.getTimestamp().getNanos()))
-                .setPayload(ssEvent)
+                .setId(record.getId())
+                .setHubId(record.getHubId())
+                .setTimestamp(record.getTimestamp())
+                .setPayload(payload)
                 .build();
     }
+
+    @Override
+    public SensorEventType getMessageType() {
+        return SensorEventType.SWITCH_SENSOR_EVENT;
+    }
 }
+
