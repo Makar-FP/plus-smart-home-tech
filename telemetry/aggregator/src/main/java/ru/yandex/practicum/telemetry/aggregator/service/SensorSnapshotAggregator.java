@@ -58,8 +58,8 @@ public class SensorSnapshotAggregator {
                         ProducerRecord<String, SpecificRecordBase> snapshotRecord =
                                 new ProducerRecord<>(
                                         EventTopic.TELEMETRY_SNAPSHOT_TOPIC,
-                                        snapshot.getHubId(),
-                                        snapshot
+                                        snapshotAvro.get().getHubId(),
+                                        snapshotAvro.get()
                                 );
 
                         client.getProducer().send(snapshotRecord);
