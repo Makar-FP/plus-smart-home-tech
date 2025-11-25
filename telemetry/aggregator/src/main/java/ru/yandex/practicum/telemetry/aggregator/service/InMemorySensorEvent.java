@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.kafka.telemetry.event.SensorEventAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorStateAvro;
-import ru.yandex.practicum.kafka.telemetry.event.SensorSnapshotAvro;
+import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,14 +13,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class InMemorySensorEvent {
 
-    private final Map<String, SensorSnapshotAvro> snapshots = new ConcurrentHashMap<>();
+    private final Map<String, SensorsSnapshotAvro> snapshots = new ConcurrentHashMap<>();
 
-    public Optional<SensorSnapshotAvro> updateState(SensorEventAvro event) {
+    public Optional<SensorsSnapshotAvro> updateState(SensorEventAvro event) {
         log.debug("Snapshots map: {}", snapshots);
         String hubId = event.getHubId();
         String sensorId = event.getId();
 
-        SensorSnapshotAvro snapshot = snapshots.get(hubId);
+        SensorsSnapshotAvro snapshot = snapshots.get(hubId);
         if (snapshot != null) {
             log.debug("Snapshot found for hubId={}", hubId);
 
@@ -63,11 +63,11 @@ public class InMemorySensorEvent {
         }
 
         log.debug("No snapshot for hubId={}, creating new", hubId);
-        SensorSnapshotAvro newSnapshot = addSnapshot(event);
+        SensorsSnapshotAvro newSnapshot = addSnapshot(event);
         return Optional.of(newSnapshot);
     }
 
-    private SensorSnapshotAvro addSnapshot(SensorEventAvro record) {
+    private SensorsSnapshotAvro addSnapshot(SensorEventAvro record) {
         String hubId = record.getHubId();
 
         Map<String, SensorStateAvro> sensorsState = new HashMap<>();
@@ -77,7 +77,7 @@ public class InMemorySensorEvent {
                 .build();
         sensorsState.put(record.getId(), state);
 
-        SensorSnapshotAvro snapshot  = SensorSnapshotAvro.newBuilder()
+        SensorsSnapshotAvro snapshot  = SensorsSnapshotAvro.newBuilder()
                 .setTimestamp(record.getTimestamp())
                 .setHubId(hubId)
                 .setSensorsState(sensorsState)

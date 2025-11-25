@@ -10,6 +10,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.kafka.telemetry.event.SensorEventAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorSnapshotAvro;
+import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
 import ru.yandex.practicum.telemetry.aggregator.config.EventClient;
 import ru.yandex.practicum.telemetry.aggregator.config.EventTopic;
 
@@ -69,14 +70,14 @@ public class SensorSnapshotAggregator {
                 record.topic(), record.partition(), record.offset());
 
         SensorEventAvro event = (SensorEventAvro) record.value();
-        Optional<SensorSnapshotAvro> snapshotAvro = service.updateState(event);
+        Optional<SensorsSnapshotAvro> snapshotAvro = service.updateState(event);
 
         if (snapshotAvro.isEmpty()) {
             log.debug("Snapshot was not updated (no changes detected).");
             return;
         }
 
-        SensorSnapshotAvro snapshot = snapshotAvro.get();
+        SensorsSnapshotAvro snapshot = snapshotAvro.get();
         log.info("New snapshot created/updated: {}", snapshot);
 
         ProducerRecord<String, SpecificRecordBase> snapshotRecord =
