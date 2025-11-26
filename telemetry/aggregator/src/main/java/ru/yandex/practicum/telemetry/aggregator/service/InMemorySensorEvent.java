@@ -1,30 +1,32 @@
 package ru.yandex.practicum.telemetry.aggregator.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.kafka.telemetry.event.SensorEventAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorStateAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class InMemorySensorEvent {
 
-    private final Map<String, SensorsSnapshotAvro> snapshots;
+    private final Map<String, SensorsSnapshotAvro> snapshots = new ConcurrentHashMap<>();
 
     public Optional<SensorsSnapshotAvro> updateState(SensorEventAvro event) {
         String hubId = event.getHubId();
         String sensorId = event.getId();
 
+        log.debug("Updating snapshot for hubId={}, sensorId={}", hubId, sensorId);
+
         SensorsSnapshotAvro snapshot = snapshots.get(hubId);
         if (snapshot == null) {
             SensorsSnapshotAvro created = addSnapshot(event);
+            log.debug("Created new snapshot for hubId={}: {}", hubId, created);
             return Optional.of(created);
         }
 
@@ -36,6 +38,7 @@ public class InMemorySensorEvent {
         snapshot.setTimestamp(event.getTimestamp());
         snapshot.getSensorsState().put(sensorId, newState);
 
+        log.debug("Updated snapshot for hubId={}, sensorId={}: {}", hubId, sensorId, snapshot);
         return Optional.of(snapshot);
     }
 

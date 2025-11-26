@@ -44,7 +44,7 @@ public class EventConfig {
                         "ru.yandex.practicum.telemetry.aggregator.config.SensorEventDeserializer");
                 config.setProperty(ConsumerConfig.GROUP_ID_CONFIG,
                         "consumer-client-" + counter.getAndIncrement());
-                config.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "500");
+                config.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "30000");
 
                 sensorConsumer = new KafkaConsumer<>(config);
             }
