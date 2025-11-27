@@ -21,25 +21,43 @@ public class InMemorySensorEvent {
         String hubId = event.getHubId();
         String sensorId = event.getId();
 
-        log.debug("Updating snapshot for hubId={}, sensorId={}", hubId, sensorId);
-
         SensorsSnapshotAvro snapshot = snapshots.get(hubId);
         if (snapshot == null) {
             SensorsSnapshotAvro created = addSnapshot(event);
-            log.debug("Created new snapshot for hubId={}: {}", hubId, created);
             return Optional.of(created);
         }
 
-        SensorStateAvro newState = SensorStateAvro.newBuilder()
+        Map<String, SensorStateAvro> sensorsState = snapshot.getSensorsState();
+        SensorStateAvro oldState = sensorsState.get(sensorId);
+
+        if (oldState == null) {
+            SensorStateAvro newState = buildState(event);
+            snapshot.setTimestamp(event.getTimestamp());
+            sensorsState.put(sensorId, newState);
+            return Optional.of(snapshot);
+        }
+
+        if (oldState.getTimestamp().isAfter(event.getTimestamp())) {
+            return Optional.empty();
+        }
+
+        String oldDataStr = oldState.getData().toString();
+        String newDataStr = event.getPayload().toString();
+        if (oldDataStr.equals(newDataStr)) {
+            return Optional.empty();
+        }
+
+        SensorStateAvro newState = buildState(event);
+        snapshot.setTimestamp(event.getTimestamp());
+        sensorsState.put(sensorId, newState);
+        return Optional.of(snapshot);
+    }
+
+    private SensorStateAvro buildState(SensorEventAvro event) {
+        return SensorStateAvro.newBuilder()
                 .setTimestamp(event.getTimestamp())
                 .setData(event.getPayload())
                 .build();
-
-        snapshot.setTimestamp(event.getTimestamp());
-        snapshot.getSensorsState().put(sensorId, newState);
-
-        log.debug("Updated snapshot for hubId={}, sensorId={}: {}", hubId, sensorId, snapshot);
-        return Optional.of(snapshot);
     }
 
     private SensorsSnapshotAvro addSnapshot(SensorEventAvro record) {
@@ -47,11 +65,7 @@ public class InMemorySensorEvent {
         String sensorId = record.getId();
 
         Map<String, SensorStateAvro> sensorsState = new HashMap<>();
-        SensorStateAvro state = SensorStateAvro.newBuilder()
-                .setTimestamp(record.getTimestamp())
-                .setData(record.getPayload())
-                .build();
-        sensorsState.put(sensorId, state);
+        sensorsState.put(sensorId, buildState(record));
 
         SensorsSnapshotAvro snapshot = SensorsSnapshotAvro.newBuilder()
                 .setTimestamp(record.getTimestamp())
