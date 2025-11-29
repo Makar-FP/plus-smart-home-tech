@@ -1,4 +1,4 @@
-package ru.yandex.practicum.telemetry.collector.configuration;
+package ru.yandex.practicum.telemetry.collector.config;
 
 import org.apache.avro.specific.SpecificRecordBase;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Properties;
 
 @Configuration
-public class EventConfiguration {
+public class EventConfig {
 
     @Value("${kafka.bootstrap-servers:localhost:9092}")
     private String bootstrapServers;

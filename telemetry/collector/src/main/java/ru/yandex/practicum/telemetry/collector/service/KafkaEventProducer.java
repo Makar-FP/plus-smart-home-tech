@@ -5,28 +5,33 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.specific.SpecificRecordBase;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.telemetry.collector.configuration.EventClient;
+import ru.yandex.practicum.telemetry.collector.config.EventClient;
+import ru.yandex.practicum.telemetry.collector.config.EventTopic;
 
 @Slf4j
 @Service
 @AllArgsConstructor
 public class KafkaEventProducer {
-
     private final EventClient client;
 
     public void sendHubEventToKafka(SpecificRecordBase message) {
-        String topic = "telemetry.hubs.v1";
-        ProducerRecord<String, SpecificRecordBase> record =
-                new ProducerRecord<>(topic, message);
-        log.info("--> Sending message to Kafka (HubEventAvro): {}", record);
-        client.getProducer().send(record);
+        sendEventToKafka(EventTopic.TELEMETRY_HUB_TOPIC, "HubEventAvro", message);
     }
 
     public void sendSensorEventToKafka(SpecificRecordBase message) {
-        String topic = "telemetry.sensors.v1";
-        ProducerRecord<String, SpecificRecordBase> record =
-                new ProducerRecord<>(topic, message);
-        log.info("--> Sending message to Kafka (SensorEventAvro): {}", record);
-        client.getProducer().send(record);
+        sendEventToKafka(EventTopic.TELEMETRY_SENSOR_TOPIC, "SensorEventAvro", message);
+    }
+
+    private void sendEventToKafka(String topic, String eventType, SpecificRecordBase message) {
+        ProducerRecord<String, SpecificRecordBase> record = new ProducerRecord<>(topic, message);
+        log.info("--> Sending message to Kafka ({}): topic={}, value={}", eventType, topic, message);
+        client.getProducer().send(record, (metadata, exception) -> {
+            if (exception != null) {
+                log.error("Failed to send message to Kafka ({}), topic={}", eventType, topic, exception);
+            } else {
+                log.debug("Message sent to Kafka successfully ({}): topic={}, partition={}, offset={}",
+                        eventType, metadata.topic(), metadata.partition(), metadata.offset());
+            }
+        });
     }
 }
