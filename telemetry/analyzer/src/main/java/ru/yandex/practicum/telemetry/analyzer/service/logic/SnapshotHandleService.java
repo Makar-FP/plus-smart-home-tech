@@ -37,44 +37,38 @@ public class SnapshotHandleService {
             Map<String, SensorStateAvro> sensorsState = snapshot.getSensorsState();
 
             if (sensorsState == null || sensorsState.isEmpty()) {
-                log.debug("Empty sensors state for hub {}, skip snapshot", hubId);
+                log.debug("Snapshot for hub {} has empty sensors state, nothing to do", hubId);
                 return;
             }
 
             List<Scenario> scenarios = scenarioRepo.findByHubId(hubId);
             if (scenarios.isEmpty()) {
-                log.debug("No scenarios found for hub {}, skip snapshot", hubId);
+                log.debug("No scenarios found for hub {}, nothing to do", hubId);
                 return;
             }
 
             for (Scenario scenario : scenarios) {
                 Map<String, Condition> conditions = scenario.getConditions();
                 if (conditions == null || conditions.isEmpty()) {
-                    log.debug("Scenario '{}' for hub {} has no conditions, skip", scenario.getName(), hubId);
                     continue;
                 }
-
-                if (!sensorRepo.existsByIdInAndHubId(conditions.keySet(), hubId)) {
-                    log.debug("Scenario '{}' has sensors not belonging to hub {}, skipping",
-                            scenario.getName(), hubId);
-                    continue;
-                }
-
-                if (!sensorsState.keySet().containsAll(conditions.keySet())) {
-                    log.debug("Snapshot for hub {} does not contain all sensors required for scenario '{}'",
-                            hubId, scenario.getName());
-                    continue;
-                }
-
                 boolean allConditionsTrue = conditions.entrySet().stream()
-                        .allMatch(entry -> isConditionSatisfied(entry.getValue(), sensorsState.get(entry.getKey())));
+                        .allMatch(entry -> {
+                            String sensorId = entry.getKey();
+                            Condition condition = entry.getValue();
+                            SensorStateAvro state = sensorsState.get(sensorId);
+                            boolean result = isConditionSatisfied(condition, state);
+
+                            log.debug("Scenario '{}', sensor {}: condition {} -> {}",
+                                    scenario.getName(), sensorId, condition.getType(), result);
+
+                            return result;
+                        });
 
                 if (allConditionsTrue) {
                     log.info("All conditions satisfied for scenario '{}' on hub {}, executing actions",
                             scenario.getName(), hubId);
                     executeActions(hubId, scenario.getName(), scenario.getActions());
-                } else {
-                    log.debug("Conditions NOT satisfied for scenario '{}' on hub {}", scenario.getName(), hubId);
                 }
             }
         } catch (Exception e) {
@@ -87,42 +81,51 @@ public class SnapshotHandleService {
             return false;
         }
 
+        Object data = state.getData();
+
         return switch (condition.getType()) {
             case SWITCH -> {
-                SwitchSensorAvro data = (SwitchSensorAvro) state.getData();
+                if (!(data instanceof SwitchSensorAvro sensor)) {
+                    yield false;
+                }
                 boolean expectedOn = condition.getValue() == 1;
-                yield data.getState() == expectedOn;
+                yield sensor.getState() == expectedOn;
             }
             case MOTION -> {
-                MotionSensorAvro data = (MotionSensorAvro) state.getData();
+                if (!(data instanceof MotionSensorAvro sensor)) {
+                    yield false;
+                }
                 boolean expectedMotion = condition.getValue() == 1;
-                yield data.getMotion() == expectedMotion;
+                yield sensor.getMotion() == expectedMotion;
             }
             case LUMINOSITY -> {
-                LightSensorAvro data = (LightSensorAvro) state.getData();
-                yield compareNumeric(condition.getOperation(), condition.getValue(), data.getLuminosity());
-            }
-            case CO2_LEVEL -> {
-                ClimateSensorAvro data = (ClimateSensorAvro) state.getData();
-                yield compareNumeric(condition.getOperation(), condition.getValue(), data.getCo2Level());
-            }
-            case HUMIDITY -> {
-                ClimateSensorAvro data = (ClimateSensorAvro) state.getData();
-                yield compareNumeric(condition.getOperation(), condition.getValue(), data.getHumidity());
+                if (!(data instanceof LightSensorAvro sensor)) {
+                    yield false;
+                }
+                yield compareNumeric(condition.getOperation(), condition.getValue(), sensor.getLuminosity());
             }
             case TEMPERATURE -> {
-                Object raw = state.getData();
                 int actualTemperature;
-
-                if (raw instanceof TemperatureSensorAvro t) {
+                if (data instanceof TemperatureSensorAvro t) {
                     actualTemperature = t.getTemperatureC();
-                } else if (raw instanceof ClimateSensorAvro c) {
+                } else if (data instanceof ClimateSensorAvro c) {
                     actualTemperature = c.getTemperatureC();
                 } else {
                     yield false;
                 }
-
                 yield compareNumeric(condition.getOperation(), condition.getValue(), actualTemperature);
+            }
+            case CO2_LEVEL -> {
+                if (!(data instanceof ClimateSensorAvro c)) {
+                    yield false;
+                }
+                yield compareNumeric(condition.getOperation(), condition.getValue(), c.getCo2Level());
+            }
+            case HUMIDITY -> {
+                if (!(data instanceof ClimateSensorAvro c)) {
+                    yield false;
+                }
+                yield compareNumeric(condition.getOperation(), condition.getValue(), c.getHumidity());
             }
         };
     }
@@ -137,7 +140,12 @@ public class SnapshotHandleService {
 
     private void executeActions(String hubId, String scenarioName, Map<String, Action> actions) {
         if (actions == null || actions.isEmpty()) {
-            log.debug("No actions for scenario '{}' on hub {}, nothing to execute", scenarioName, hubId);
+            log.debug("Scenario '{}' on hub {} has no actions", scenarioName, hubId);
+            return;
+        }
+
+        if (hubRouterClient == null) {
+            log.error("hubRouterClient is null, cannot send commands to Hub Router");
             return;
         }
 
@@ -149,11 +157,9 @@ public class SnapshotHandleService {
 
         actions.forEach((sensorId, action) -> {
             try {
-                ActionTypeProto protoType = ActionTypeProto.valueOf(action.getType().name());
-
                 DeviceActionProto.Builder actionBuilder = DeviceActionProto.newBuilder()
                         .setSensorId(sensorId)
-                        .setType(protoType);
+                        .setType(ActionTypeProto.valueOf(action.getType().name()));
 
                 if (action.getType() == ActionTypeAvro.SET_VALUE) {
                     actionBuilder.setValue(action.getValue());
@@ -166,15 +172,12 @@ public class SnapshotHandleService {
                         .setTimestamp(timestamp)
                         .build();
 
-                log.info("Sending device action via gRPC: hubId={}, scenario='{}', sensorId={}, type={}, value={}",
-                        hubId, scenarioName, sensorId, action.getType(), action.getValue());
-
                 hubRouterClient.handleDeviceAction(request);
-            } catch (IllegalArgumentException e) {
-                log.error("Failed to map action type {} to proto enum for sensor {} in scenario '{}'",
-                        action.getType(), sensorId, scenarioName, e);
+
+                log.info("Sent device action to Hub Router: hubId={}, scenario='{}', sensorId={}, type={}",
+                        hubId, scenarioName, sensorId, action.getType());
             } catch (Exception e) {
-                log.error("Failed to send device action for sensor {} in scenario '{}' on hub {}",
+                log.error("Failed to send action for sensor {} in scenario '{}' on hub {}",
                         sensorId, scenarioName, hubId, e);
             }
         });
