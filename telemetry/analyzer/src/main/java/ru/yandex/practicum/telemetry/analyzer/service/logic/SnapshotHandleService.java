@@ -16,6 +16,7 @@ import ru.yandex.practicum.telemetry.analyzer.persistence.model.Scenario;
 import ru.yandex.practicum.telemetry.analyzer.persistence.repo.ScenarioRepo;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -40,7 +41,7 @@ public class SnapshotHandleService {
             }
 
             List<Scenario> scenarios = scenarioRepo.findByHubId(hubId);
-            if (scenarios.isEmpty()) {
+            if (scenarios == null || scenarios.isEmpty()) {
                 log.debug("No scenarios found for hub {}, nothing to do", hubId);
                 return;
             }
@@ -51,22 +52,30 @@ public class SnapshotHandleService {
                     continue;
                 }
 
-                boolean allConditionsTrue = conditions.entrySet().stream()
-                        .allMatch(entry -> {
-                            String sensorId = entry.getKey();
-                            Condition condition = entry.getValue();
-                            SensorStateAvro state = sensorsState.get(sensorId);
-                            boolean result = isConditionSatisfied(condition, state);
+                List<Boolean> results = new ArrayList<>();
 
-                            log.debug("Scenario '{}', hub {}, sensor {}: type={}, op={}, value={} -> {}",
-                                    scenario.getName(), hubId, sensorId,
-                                    condition.getType(), condition.getOperation(), condition.getValue(),
-                                    result);
+                for (Map.Entry<String, Condition> entry : conditions.entrySet()) {
+                    String sensorId = entry.getKey();
+                    Condition condition = entry.getValue();
+                    SensorStateAvro state = sensorsState.get(sensorId);
 
-                            return result;
-                        });
+                    if (state == null) {
+                        log.debug("Scenario '{}', hub {}: no state for sensor {}, skipping condition",
+                                scenario.getName(), hubId, sensorId);
+                        continue;
+                    }
 
-                if (allConditionsTrue) {
+                    boolean result = isConditionSatisfied(condition, state);
+
+                    log.debug("Scenario '{}', hub {}, sensor {}: type={}, op={}, value={} -> {}",
+                            scenario.getName(), hubId, sensorId,
+                            condition.getType(), condition.getOperation(), condition.getValue(),
+                            result);
+
+                    results.add(result);
+                }
+
+                if (!results.isEmpty() && results.stream().allMatch(Boolean::booleanValue)) {
                     log.info("All conditions satisfied for scenario '{}' on hub {}, executing actions",
                             scenario.getName(), hubId);
                     executeActions(hubId, scenario.getName(), scenario.getActions());
