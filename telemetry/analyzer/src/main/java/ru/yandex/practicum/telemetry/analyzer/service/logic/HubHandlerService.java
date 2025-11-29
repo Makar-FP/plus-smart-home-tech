@@ -8,13 +8,12 @@ import ru.yandex.practicum.telemetry.analyzer.persistence.model.Action;
 import ru.yandex.practicum.telemetry.analyzer.persistence.model.Condition;
 import ru.yandex.practicum.telemetry.analyzer.persistence.model.Scenario;
 import ru.yandex.practicum.telemetry.analyzer.persistence.model.Sensor;
-import ru.yandex.practicum.telemetry.analyzer.persistence.repo.ActionRepo;
-import ru.yandex.practicum.telemetry.analyzer.persistence.repo.ConditionRepo;
 import ru.yandex.practicum.telemetry.analyzer.persistence.repo.ScenarioRepo;
 import ru.yandex.practicum.telemetry.analyzer.persistence.repo.SensorRepo;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -22,96 +21,117 @@ import java.util.Map;
 public class HubHandlerService {
 
     private final SensorRepo sensorRepo;
-    private final ConditionRepo conditionRepo;
-    private final ActionRepo actionRepo;
     private final ScenarioRepo scenarioRepo;
 
-    public void handleRecord(HubEventAvro record) {
-        var payload = record.getPayload();
-        String hubId = record.getHubId();
+    public void handleRecord(HubEventAvro event) {
+        Object payload = event.getPayload();
+        String hubId = event.getHubId();
 
-        if (payload instanceof DeviceAddedEventAvro event) {
-            handleDeviceAdded(hubId, event);
-        } else if (payload instanceof DeviceRemovedEventAvro event) {
-            handleDeviceRemoved(hubId, event);
-        } else if (payload instanceof ScenarioAddedEventAvro event) {
-            handleScenarioAdded(hubId, event);
-        } else if (payload instanceof ScenarioRemovedEventAvro event) {
-            handleScenarioRemoved(hubId, event);
-        } else {
-            log.warn("Unknown hub event payload type: {}",
-                    payload != null ? payload.getClass().getName() : "null");
+        try {
+            if (payload instanceof DeviceAddedEventAvro deviceAdded) {
+                handleDeviceAdded(hubId, deviceAdded);
+            } else if (payload instanceof DeviceRemovedEventAvro deviceRemoved) {
+                handleDeviceRemoved(hubId, deviceRemoved);
+            } else if (payload instanceof ScenarioAddedEventAvro scenarioAdded) {
+                handleScenarioAdded(hubId, scenarioAdded);
+            } else if (payload instanceof ScenarioRemovedEventAvro scenarioRemoved) {
+                handleScenarioRemoved(hubId, scenarioRemoved);
+            } else {
+                log.warn("Unsupported hub event payload type: {}", payload.getClass().getSimpleName());
+            }
+        } catch (Exception e) {
+            log.error("Error while handling hub event for hub {}", hubId, e);
         }
     }
 
     private void handleDeviceAdded(String hubId, DeviceAddedEventAvro event) {
         String sensorId = event.getId();
-        sensorRepo.findByIdAndHubId(sensorId, hubId)
-                .ifPresentOrElse(
-                        s -> log.debug("Sensor {} for hub {} already exists, skipping add", sensorId, hubId),
-                        () -> {
-                            Sensor sensor = new Sensor(sensorId, hubId);
-                            sensorRepo.save(sensor);
-                            log.info("Sensor {} added for hub {}", sensorId, hubId);
-                        }
-                );
+
+        Optional<Sensor> existing = sensorRepo.findById(sensorId);
+        if (existing.isPresent()) {
+            log.debug("Sensor {} for hub {} already exists, skipping", sensorId, hubId);
+            return;
+        }
+
+        Sensor sensor = new Sensor();
+        sensor.setId(sensorId);
+        sensor.setHubId(hubId);
+
+        sensorRepo.save(sensor);
+        log.info("Sensor {} registered for hub {}", sensorId, hubId);
     }
 
     private void handleDeviceRemoved(String hubId, DeviceRemovedEventAvro event) {
         String sensorId = event.getId();
-        sensorRepo.findByIdAndHubId(sensorId, hubId)
-                .ifPresent(sensor -> {
-                    sensorRepo.delete(sensor);
-                    log.info("Sensor {} removed for hub {}", sensorId, hubId);
-                });
+        if (sensorRepo.existsById(sensorId)) {
+            sensorRepo.deleteById(sensorId);
+            log.info("Sensor {} removed for hub {}", sensorId, hubId);
+        } else {
+            log.debug("Sensor {} for hub {} does not exist, nothing to remove", sensorId, hubId);
+        }
     }
 
     private void handleScenarioAdded(String hubId, ScenarioAddedEventAvro event) {
-        Map<String, Condition> scenarioConditions = new HashMap<>();
-        for (ScenarioConditionAvro conditionAvro : event.getConditions()) {
-            Condition condition = new Condition();
-            condition.setType(conditionAvro.getType());
-            condition.setOperation(conditionAvro.getOperation());
-
-            Object rawValue = conditionAvro.getValue();
-            int value = (rawValue instanceof Boolean b) ? (b ? 1 : 0) : ((Number) rawValue).intValue();
-            condition.setValue(value);
-
-            conditionRepo.save(condition);
-            scenarioConditions.put(conditionAvro.getSensorId(), condition);
-        }
-
-        Map<String, Action> scenarioActions = new HashMap<>();
-        for (DeviceActionAvro actionAvro : event.getActions()) {
-            Action action = new Action();
-            action.setType(actionAvro.getType());
-            action.setValue(actionAvro.getValue());
-            actionRepo.save(action);
-
-            scenarioActions.put(actionAvro.getSensorId(), action);
-        }
+        String name = event.getName();
 
         Scenario scenario = scenarioRepo
-                .findByHubIdAndName(hubId, event.getName())
+                .findByHubIdAndName(hubId, name)
                 .orElseGet(Scenario::new);
 
         scenario.setHubId(hubId);
-        scenario.setName(event.getName());
-        scenario.getConditions().clear();
-        scenario.getConditions().putAll(scenarioConditions);
-        scenario.getActions().clear();
-        scenario.getActions().putAll(scenarioActions);
+        scenario.setName(name);
+
+        Map<String, Condition> conditions = new HashMap<>();
+        for (ScenarioConditionAvro condAvro : event.getConditions()) {
+            Condition condition = new Condition();
+            condition.setType(condAvro.getType());
+            condition.setOperation(condAvro.getOperation());
+
+            Object rawValue = condAvro.getValue();
+            int storedValue;
+            if (rawValue == null) {
+                storedValue = 0;
+            } else if (rawValue instanceof Integer i) {
+                storedValue = i;
+            } else if (rawValue instanceof Boolean b) {
+                storedValue = b ? 1 : 0;
+            } else {
+                throw new IllegalArgumentException(
+                        "Unsupported condition value type: " + rawValue.getClass().getName()
+                );
+            }
+
+            condition.setValue(storedValue);
+            conditions.put(condAvro.getSensorId(), condition);
+        }
+
+        Map<String, Action> actions = new HashMap<>();
+        for (DeviceActionAvro actionAvro : event.getActions()) {
+            Action action = new Action();
+            action.setType(actionAvro.getType());
+            Integer value = actionAvro.getValue();
+            action.setValue(value != null ? value : 0);
+            actions.put(actionAvro.getSensorId(), action);
+        }
+
+        scenario.setConditions(conditions);
+        scenario.setActions(actions);
 
         scenarioRepo.save(scenario);
-        log.info("Scenario '{}' for hub {} saved/updated", event.getName(), hubId);
+        log.info(
+                "Stored/updated scenario '{}' for hub {} (conditions={}, actions={})",
+                name, hubId, conditions.size(), actions.size()
+        );
     }
 
     private void handleScenarioRemoved(String hubId, ScenarioRemovedEventAvro event) {
-        scenarioRepo.findByHubIdAndName(hubId, event.getName())
-                .ifPresent(scenario -> {
-                    scenarioRepo.delete(scenario);
-                    log.info("Scenario '{}' for hub {} removed", event.getName(), hubId);
-                });
+        String name = event.getName();
+        scenarioRepo.findByHubIdAndName(hubId, name).ifPresentOrElse(
+                s -> {
+                    scenarioRepo.delete(s);
+                    log.info("Scenario '{}' removed for hub {}", name, hubId);
+                },
+                () -> log.debug("Scenario '{}' for hub {} not found, nothing to remove", name, hubId)
+        );
     }
 }
-

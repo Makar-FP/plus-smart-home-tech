@@ -14,7 +14,6 @@ import ru.yandex.practicum.telemetry.analyzer.persistence.model.Action;
 import ru.yandex.practicum.telemetry.analyzer.persistence.model.Condition;
 import ru.yandex.practicum.telemetry.analyzer.persistence.model.Scenario;
 import ru.yandex.practicum.telemetry.analyzer.persistence.repo.ScenarioRepo;
-import ru.yandex.practicum.telemetry.analyzer.persistence.repo.SensorRepo;
 
 import java.time.Instant;
 import java.util.List;
@@ -25,7 +24,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SnapshotHandleService {
 
-    private final SensorRepo sensorRepo;
     private final ScenarioRepo scenarioRepo;
 
     @GrpcClient("hub-router")
@@ -52,6 +50,7 @@ public class SnapshotHandleService {
                 if (conditions == null || conditions.isEmpty()) {
                     continue;
                 }
+
                 boolean allConditionsTrue = conditions.entrySet().stream()
                         .allMatch(entry -> {
                             String sensorId = entry.getKey();
@@ -59,15 +58,24 @@ public class SnapshotHandleService {
                             SensorStateAvro state = sensorsState.get(sensorId);
                             boolean result = isConditionSatisfied(condition, state);
 
-                            log.debug("Scenario '{}', sensor {}: condition {} -> {}",
-                                    scenario.getName(), sensorId, condition.getType(), result);
+                            log.debug(
+                                    "Scenario '{}', sensor {}: condition {} {} -> {}",
+                                    scenario.getName(),
+                                    sensorId,
+                                    condition.getType(),
+                                    condition.getOperation(),
+                                    result
+                            );
 
                             return result;
                         });
 
                 if (allConditionsTrue) {
-                    log.info("All conditions satisfied for scenario '{}' on hub {}, executing actions",
-                            scenario.getName(), hubId);
+                    log.info(
+                            "All conditions satisfied for scenario '{}' on hub {}, executing actions",
+                            scenario.getName(),
+                            hubId
+                    );
                     executeActions(hubId, scenario.getName(), scenario.getActions());
                 }
             }
@@ -82,27 +90,28 @@ public class SnapshotHandleService {
         }
 
         Object data = state.getData();
+        int expected = condition.getValue();
 
         return switch (condition.getType()) {
             case SWITCH -> {
                 if (!(data instanceof SwitchSensorAvro sensor)) {
                     yield false;
                 }
-                boolean expectedOn = condition.getValue() == 1;
+                boolean expectedOn = expected == 1;
                 yield sensor.getState() == expectedOn;
             }
             case MOTION -> {
                 if (!(data instanceof MotionSensorAvro sensor)) {
                     yield false;
                 }
-                boolean expectedMotion = condition.getValue() == 1;
+                boolean expectedMotion = expected == 1;
                 yield sensor.getMotion() == expectedMotion;
             }
             case LUMINOSITY -> {
                 if (!(data instanceof LightSensorAvro sensor)) {
                     yield false;
                 }
-                yield compareNumeric(condition.getOperation(), condition.getValue(), sensor.getLuminosity());
+                yield compareNumeric(condition.getOperation(), expected, sensor.getLuminosity());
             }
             case TEMPERATURE -> {
                 int actualTemperature;
@@ -113,19 +122,19 @@ public class SnapshotHandleService {
                 } else {
                     yield false;
                 }
-                yield compareNumeric(condition.getOperation(), condition.getValue(), actualTemperature);
+                yield compareNumeric(condition.getOperation(), expected, actualTemperature);
             }
             case CO2_LEVEL -> {
                 if (!(data instanceof ClimateSensorAvro c)) {
                     yield false;
                 }
-                yield compareNumeric(condition.getOperation(), condition.getValue(), c.getCo2Level());
+                yield compareNumeric(condition.getOperation(), expected, c.getCo2Level());
             }
             case HUMIDITY -> {
                 if (!(data instanceof ClimateSensorAvro c)) {
                     yield false;
                 }
-                yield compareNumeric(condition.getOperation(), condition.getValue(), c.getHumidity());
+                yield compareNumeric(condition.getOperation(), expected, c.getHumidity());
             }
         };
     }
@@ -174,11 +183,15 @@ public class SnapshotHandleService {
 
                 hubRouterClient.handleDeviceAction(request);
 
-                log.info("Sent device action to Hub Router: hubId={}, scenario='{}', sensorId={}, type={}",
-                        hubId, scenarioName, sensorId, action.getType());
+                log.info(
+                        "Sent device action to Hub Router: hubId={}, scenario='{}', sensorId={}, type={}",
+                        hubId, scenarioName, sensorId, action.getType()
+                );
             } catch (Exception e) {
-                log.error("Failed to send action for sensor {} in scenario '{}' on hub {}",
-                        sensorId, scenarioName, hubId, e);
+                log.error(
+                        "Failed to send action for sensor {} in scenario '{}' on hub {}",
+                        sensorId, scenarioName, hubId, e
+                );
             }
         });
     }
