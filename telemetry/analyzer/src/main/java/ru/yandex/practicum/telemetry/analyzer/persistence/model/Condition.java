@@ -26,7 +26,6 @@ public class Condition {
     @Column(nullable = false)
     private ConditionOperationAvro operation;
 
-    @Column(nullable = false)
+    @Column
     private Integer value;
 }
-

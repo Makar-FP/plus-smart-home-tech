@@ -58,24 +58,17 @@ public class SnapshotHandleService {
                             SensorStateAvro state = sensorsState.get(sensorId);
                             boolean result = isConditionSatisfied(condition, state);
 
-                            log.debug(
-                                    "Scenario '{}', sensor {}: condition {} {} -> {}",
-                                    scenario.getName(),
-                                    sensorId,
-                                    condition.getType(),
-                                    condition.getOperation(),
-                                    result
-                            );
+                            log.debug("Scenario '{}', hub {}, sensor {}: type={}, op={}, value={} -> {}",
+                                    scenario.getName(), hubId, sensorId,
+                                    condition.getType(), condition.getOperation(), condition.getValue(),
+                                    result);
 
                             return result;
                         });
 
                 if (allConditionsTrue) {
-                    log.info(
-                            "All conditions satisfied for scenario '{}' on hub {}, executing actions",
-                            scenario.getName(),
-                            hubId
-                    );
+                    log.info("All conditions satisfied for scenario '{}' on hub {}, executing actions",
+                            scenario.getName(), hubId);
                     executeActions(hubId, scenario.getName(), scenario.getActions());
                 }
             }
@@ -90,9 +83,11 @@ public class SnapshotHandleService {
         }
 
         Object data = state.getData();
-        int expected = condition.getValue();
+        ConditionTypeAvro type = condition.getType();
+        ConditionOperationAvro operation = condition.getOperation();
+        int expected = condition.getValue() != null ? condition.getValue() : 0;
 
-        return switch (condition.getType()) {
+        return switch (type) {
             case SWITCH -> {
                 if (!(data instanceof SwitchSensorAvro sensor)) {
                     yield false;
@@ -111,7 +106,7 @@ public class SnapshotHandleService {
                 if (!(data instanceof LightSensorAvro sensor)) {
                     yield false;
                 }
-                yield compareNumeric(condition.getOperation(), expected, sensor.getLuminosity());
+                yield compareNumeric(operation, expected, sensor.getLuminosity());
             }
             case TEMPERATURE -> {
                 int actualTemperature;
@@ -122,19 +117,19 @@ public class SnapshotHandleService {
                 } else {
                     yield false;
                 }
-                yield compareNumeric(condition.getOperation(), expected, actualTemperature);
+                yield compareNumeric(operation, expected, actualTemperature);
             }
             case CO2_LEVEL -> {
                 if (!(data instanceof ClimateSensorAvro c)) {
                     yield false;
                 }
-                yield compareNumeric(condition.getOperation(), expected, c.getCo2Level());
+                yield compareNumeric(operation, expected, c.getCo2Level());
             }
             case HUMIDITY -> {
                 if (!(data instanceof ClimateSensorAvro c)) {
                     yield false;
                 }
-                yield compareNumeric(condition.getOperation(), expected, c.getHumidity());
+                yield compareNumeric(operation, expected, c.getHumidity());
             }
         };
     }
@@ -170,7 +165,7 @@ public class SnapshotHandleService {
                         .setSensorId(sensorId)
                         .setType(ActionTypeProto.valueOf(action.getType().name()));
 
-                if (action.getType() == ActionTypeAvro.SET_VALUE) {
+                if (action.getType() == ActionTypeAvro.SET_VALUE && action.getValue() != null) {
                     actionBuilder.setValue(action.getValue());
                 }
 
@@ -183,15 +178,11 @@ public class SnapshotHandleService {
 
                 hubRouterClient.handleDeviceAction(request);
 
-                log.info(
-                        "Sent device action to Hub Router: hubId={}, scenario='{}', sensorId={}, type={}",
-                        hubId, scenarioName, sensorId, action.getType()
-                );
+                log.info("Sent DeviceAction to Hub Router: hubId={}, scenario='{}', sensorId={}, type={}, value={}",
+                        hubId, scenarioName, sensorId, action.getType(), action.getValue());
             } catch (Exception e) {
-                log.error(
-                        "Failed to send action for sensor {} in scenario '{}' on hub {}",
-                        sensorId, scenarioName, hubId, e
-                );
+                log.error("Failed to send action for sensor {} in scenario '{}' on hub {}",
+                        sensorId, scenarioName, hubId, e);
             }
         });
     }

@@ -12,9 +12,9 @@ import org.slf4j.LoggerFactory;
 
 public class BaseAvroDeserializer<T extends SpecificRecordBase> implements Deserializer<T> {
 
-    private static final Logger log = LoggerFactory.getLogger(BaseAvroDeserializer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BaseAvroDeserializer.class);
 
-    private final DecoderFactory decoderFactory;
+    private DecoderFactory decoderFactory = DecoderFactory.get();
     protected final Schema schema;
 
     public BaseAvroDeserializer(Schema schema) {
@@ -28,18 +28,16 @@ public class BaseAvroDeserializer<T extends SpecificRecordBase> implements Deser
 
     @Override
     public T deserialize(String topic, byte[] data) {
-        if (data == null) {
-            return null;
-        }
         try {
+            if (data == null) {
+                return null;
+            }
+
             DatumReader<T> reader = new SpecificDatumReader<>(schema);
             return reader.read(null, decoderFactory.binaryDecoder(data, null));
+
         } catch (Exception e) {
-            log.error("Error deserializing data from topic [{}]", topic, e);
-            throw new SerializationException(
-                    "Error deserializing data from topic [" + topic + "]", e
-            );
+            throw new SerializationException("Failed to deserialize Avro message from topic [" + topic + "]", e);
         }
     }
 }
-

@@ -21,7 +21,6 @@ public class Action {
     @Column(nullable = false)
     private ActionTypeAvro type;
 
-    @Column(nullable = false)
+    @Column
     private Integer value;
 }
-
