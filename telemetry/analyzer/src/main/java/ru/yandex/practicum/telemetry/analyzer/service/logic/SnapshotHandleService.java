@@ -1,6 +1,8 @@
 package ru.yandex.practicum.telemetry.analyzer.service.logic;
 
 import com.google.protobuf.Timestamp;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
@@ -16,7 +18,6 @@ import ru.yandex.practicum.telemetry.analyzer.persistence.model.Scenario;
 import ru.yandex.practicum.telemetry.analyzer.persistence.repo.ScenarioRepo;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +31,30 @@ public class SnapshotHandleService {
     @GrpcClient("hub-router")
     private HubRouterControllerGrpc.HubRouterControllerBlockingStub hubRouterClient;
 
+    private ManagedChannel fallbackChannel;
+    private HubRouterControllerGrpc.HubRouterControllerBlockingStub fallbackStub;
+
+    private HubRouterControllerGrpc.HubRouterControllerBlockingStub getHubRouterClient() {
+        if (hubRouterClient != null) {
+            return hubRouterClient;
+        }
+
+        if (fallbackStub == null) {
+            synchronized (this) {
+                if (fallbackStub == null) {
+                    fallbackChannel = ManagedChannelBuilder
+                            .forAddress("localhost", 59090)
+                            .usePlaintext()
+                            .build();
+                    fallbackStub = HubRouterControllerGrpc.newBlockingStub(fallbackChannel);
+                    log.info("Created fallback Hub Router gRPC client on localhost:59090");
+                }
+            }
+        }
+
+        return fallbackStub;
+    }
+
     public void handleRecord(SensorsSnapshotAvro snapshot) {
         try {
             String hubId = snapshot.getHubId();
@@ -41,7 +66,7 @@ public class SnapshotHandleService {
             }
 
             List<Scenario> scenarios = scenarioRepo.findByHubId(hubId);
-            if (scenarios == null || scenarios.isEmpty()) {
+            if (scenarios.isEmpty()) {
                 log.debug("No scenarios found for hub {}, nothing to do", hubId);
                 return;
             }
@@ -52,30 +77,22 @@ public class SnapshotHandleService {
                     continue;
                 }
 
-                List<Boolean> results = new ArrayList<>();
+                boolean allConditionsTrue = conditions.entrySet().stream()
+                        .allMatch(entry -> {
+                            String sensorId = entry.getKey();
+                            Condition condition = entry.getValue();
+                            SensorStateAvro state = sensorsState.get(sensorId);
+                            boolean result = isConditionSatisfied(condition, state);
 
-                for (Map.Entry<String, Condition> entry : conditions.entrySet()) {
-                    String sensorId = entry.getKey();
-                    Condition condition = entry.getValue();
-                    SensorStateAvro state = sensorsState.get(sensorId);
+                            log.debug("Scenario '{}', hub {}, sensor {}: type={}, op={}, value={} -> {}",
+                                    scenario.getName(), hubId, sensorId,
+                                    condition.getType(), condition.getOperation(), condition.getValue(),
+                                    result);
 
-                    if (state == null) {
-                        log.debug("Scenario '{}', hub {}: no state for sensor {}, skipping condition",
-                                scenario.getName(), hubId, sensorId);
-                        continue;
-                    }
+                            return result;
+                        });
 
-                    boolean result = isConditionSatisfied(condition, state);
-
-                    log.debug("Scenario '{}', hub {}, sensor {}: type={}, op={}, value={} -> {}",
-                            scenario.getName(), hubId, sensorId,
-                            condition.getType(), condition.getOperation(), condition.getValue(),
-                            result);
-
-                    results.add(result);
-                }
-
-                if (!results.isEmpty() && results.stream().allMatch(Boolean::booleanValue)) {
+                if (allConditionsTrue) {
                     log.info("All conditions satisfied for scenario '{}' on hub {}, executing actions",
                             scenario.getName(), hubId);
                     executeActions(hubId, scenario.getName(), scenario.getActions());
@@ -157,8 +174,9 @@ public class SnapshotHandleService {
             return;
         }
 
-        if (hubRouterClient == null) {
-            log.error("hubRouterClient is null, cannot send commands to Hub Router");
+        HubRouterControllerGrpc.HubRouterControllerBlockingStub client = getHubRouterClient();
+        if (client == null) {
+            log.error("HubRouter gRPC client is not available, cannot send commands");
             return;
         }
 
@@ -185,7 +203,7 @@ public class SnapshotHandleService {
                         .setTimestamp(timestamp)
                         .build();
 
-                hubRouterClient.handleDeviceAction(request);
+                client.handleDeviceAction(request);
 
                 log.info("Sent DeviceAction to Hub Router: hubId={}, scenario='{}', sensorId={}, type={}, value={}",
                         hubId, scenarioName, sensorId, action.getType(), action.getValue());

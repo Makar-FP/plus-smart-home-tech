@@ -76,9 +76,12 @@ public class HubHandlerService {
             Integer value = null;
             if (rawValue instanceof Integer i) {
                 value = i;
+            } else if (rawValue instanceof Long l) {
+                value = Math.toIntExact(l);
             } else if (rawValue instanceof Boolean b) {
                 value = b ? 1 : 0;
             }
+
             condition.setValue(value);
 
             conditionRepo.save(condition);
