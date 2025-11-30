@@ -3,6 +3,7 @@ package ru.yandex.practicum.telemetry.analyzer.service.logic;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.kafka.telemetry.event.*;
 import ru.yandex.practicum.telemetry.analyzer.persistence.model.Action;
 import ru.yandex.practicum.telemetry.analyzer.persistence.model.Condition;
@@ -14,7 +15,6 @@ import ru.yandex.practicum.telemetry.analyzer.persistence.repo.ScenarioRepo;
 import ru.yandex.practicum.telemetry.analyzer.persistence.repo.SensorRepo;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -27,6 +27,7 @@ public class HubHandlerService {
     private final ActionRepo actionRepo;
     private final ScenarioRepo scenarioRepo;
 
+    @Transactional
     public void handleRecord(HubEventAvro record) {
         Object payload = record.getPayload();
         String hubId = record.getHubId();
@@ -62,40 +63,41 @@ public class HubHandlerService {
     }
 
     private void handleScenarioAdded(String hubId, ScenarioAddedEventAvro event) {
-        Map<String, Condition> scenarioConditions = new HashMap<>();
-        List<ScenarioConditionAvro> conditions = event.getConditions();
+        Scenario scenario = scenarioRepo
+                .findByHubIdAndName(hubId, event.getName())
+                .orElseGet(Scenario::new);
 
-        for (ScenarioConditionAvro conditionAvro : conditions) {
+        scenario.setHubId(hubId);
+        scenario.setName(event.getName());
+
+        Map<String, Condition> scenarioConditions = new HashMap<>();
+
+        for (ScenarioConditionAvro conditionAvro : event.getConditions()) {
             String sensorId = conditionAvro.getSensorId();
 
             Condition condition = new Condition();
-            condition.setType(conditionAvro.getType());
-            condition.setOperation(conditionAvro.getOperation());
+            condition.setType(conditionAvro.getType());          // ConditionTypeAvro
+            condition.setOperation(conditionAvro.getOperation()); // ConditionOperationAvro
 
             Object rawValue = conditionAvro.getValue();
             Integer value = null;
             if (rawValue instanceof Integer i) {
                 value = i;
-            } else if (rawValue instanceof Long l) {
-                value = Math.toIntExact(l);
             } else if (rawValue instanceof Boolean b) {
                 value = b ? 1 : 0;
             }
-
             condition.setValue(value);
 
-            conditionRepo.save(condition);
             scenarioConditions.put(sensorId, condition);
         }
 
         Map<String, Action> scenarioActions = new HashMap<>();
-        List<DeviceActionAvro> actions = event.getActions();
 
-        for (DeviceActionAvro actionAvro : actions) {
+        for (DeviceActionAvro actionAvro : event.getActions()) {
             String sensorId = actionAvro.getSensorId();
 
             Action action = new Action();
-            action.setType(actionAvro.getType());
+            action.setType(actionAvro.getType()); // ActionTypeAvro
 
             if (actionAvro.getType() == ActionTypeAvro.SET_VALUE && actionAvro.getValue() != null) {
                 action.setValue(actionAvro.getValue());
@@ -103,16 +105,9 @@ public class HubHandlerService {
                 action.setValue(null);
             }
 
-            actionRepo.save(action);
             scenarioActions.put(sensorId, action);
         }
 
-        Scenario scenario = scenarioRepo
-                .findByHubIdAndName(hubId, event.getName())
-                .orElseGet(Scenario::new);
-
-        scenario.setHubId(hubId);
-        scenario.setName(event.getName());
         scenario.setConditions(scenarioConditions);
         scenario.setActions(scenarioActions);
 
@@ -121,6 +116,7 @@ public class HubHandlerService {
         log.info("Saved scenario '{}' for hub {} ({} conditions, {} actions)",
                 scenario.getName(), hubId, scenarioConditions.size(), scenarioActions.size());
     }
+
 
     private void handleScenarioRemoved(String hubId, ScenarioRemovedEventAvro event) {
         scenarioRepo.findByHubIdAndName(hubId, event.getName())

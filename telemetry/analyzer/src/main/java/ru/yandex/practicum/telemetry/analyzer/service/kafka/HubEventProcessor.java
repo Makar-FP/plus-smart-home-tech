@@ -35,7 +35,7 @@ public class HubEventProcessor implements Runnable {
 
     @Override
     public void run() {
-        consumer = new KafkaConsumer<>(createConsumerProperties());
+        consumer = new KafkaConsumer<>(getConsumerProperties());
         consumer.subscribe(List.of("telemetry.hubs.v1"));
 
         try {
@@ -65,16 +65,13 @@ public class HubEventProcessor implements Runnable {
         }
     }
 
-    private Properties createConsumerProperties() {
-        Properties props = new Properties();
-        props.put(ConsumerConfig.CLIENT_ID_CONFIG, "analyzer-hub-events-consumer");
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "consumer-client-hub");
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                VoidDeserializer.class.getCanonicalName());
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                HubEventDeserializer.class.getCanonicalName());
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        return props;
+    private static Properties getConsumerProperties() {
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.CLIENT_ID_CONFIG, "HubEventConsumer");
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, "consumer-client-hub");
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, VoidDeserializer.class.getCanonicalName());
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, HubEventDeserializer.class.getCanonicalName());
+        return properties;
     }
 }

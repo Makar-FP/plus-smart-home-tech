@@ -38,12 +38,18 @@ public class EventConfig {
             private void initSensorConsumer() {
                 Properties config = new Properties();
                 config.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, DEFAULT_BOOTSTRAP_SERVERS);
-                config.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                        "org.apache.kafka.common.serialization.StringDeserializer");
-                config.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                        "ru.yandex.practicum.telemetry.aggregator.config.SensorEventDeserializer");
-                config.setProperty(ConsumerConfig.GROUP_ID_CONFIG,
-                        "consumer-client-" + counter.getAndIncrement());
+                config.setProperty(
+                        ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                        "org.apache.kafka.common.serialization.StringDeserializer"
+                );
+                config.setProperty(
+                        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                        "ru.yandex.practicum.telemetry.aggregator.config.SensorEventDeserializer"
+                );
+                config.setProperty(
+                        ConsumerConfig.GROUP_ID_CONFIG,
+                        "consumer-client-" + counter.getAndIncrement()
+                );
                 config.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "30000");
 
                 sensorConsumer = new KafkaConsumer<>(config);
@@ -60,10 +66,14 @@ public class EventConfig {
             private void initProducer() {
                 Properties config = new Properties();
                 config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, DEFAULT_BOOTSTRAP_SERVERS);
-                config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-                        "org.apache.kafka.common.serialization.StringSerializer");
-                config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
-                        "ru.yandex.practicum.telemetry.aggregator.config.EventAvroSerializer");
+                config.put(
+                        ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                        "org.apache.kafka.common.serialization.StringSerializer"
+                );
+                config.put(
+                        ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                        "ru.yandex.practicum.telemetry.aggregator.config.EventAvroSerializer"
+                );
 
                 producer = new KafkaProducer<>(config);
             }

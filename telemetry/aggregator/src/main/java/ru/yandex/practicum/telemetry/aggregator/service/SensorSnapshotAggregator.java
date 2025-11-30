@@ -45,31 +45,30 @@ public class SensorSnapshotAggregator {
                         consumer.poll(Duration.ofMillis(100));
 
                 for (ConsumerRecord<String, SpecificRecordBase> record : records) {
-                    log.info("Updating snapshot...");
+                    log.info("Обновление снапшота");
+
                     Optional<SensorsSnapshotAvro> snapshotAvro =
                             service.updateState((SensorEventAvro) record.value());
 
                     if (snapshotAvro.isEmpty()) {
-                        log.info("Snapshot was not updated (no changes detected).");
+                        log.info("Обновление снапшота не произошло.");
                     } else {
                         SensorsSnapshotAvro snapshot = snapshotAvro.get();
-                        log.info("New snapshot: {}", snapshot);
+                        log.info("Новый снапшот: {}", snapshot);
 
                         ProducerRecord<String, SpecificRecordBase> snapshotRecord =
                                 new ProducerRecord<>(
                                         EventTopic.TELEMETRY_SNAPSHOT_TOPIC,
-                                        snapshotAvro.get().getHubId(),
-                                        snapshotAvro.get()
+                                        snapshot.getHubId(),
+                                        snapshot
                                 );
 
                         client.getProducer().send(snapshotRecord);
-                        log.info("Snapshot sent to topic {}", EventTopic.TELEMETRY_SNAPSHOT_TOPIC);
+                        log.info("Снапшот отправлен в топик {}", EventTopic.TELEMETRY_SNAPSHOT_TOPIC);
                     }
 
-                    log.debug("... start manageOffsets");
                     manageOffsets(record, count, consumer);
                     count++;
-                    log.debug("... stop manageOffsets");
                 }
 
                 consumer.commitAsync();
@@ -77,7 +76,7 @@ public class SensorSnapshotAggregator {
 
         } catch (WakeupException ignored) {
         } catch (Exception e) {
-            log.error("Error while processing sensor events", e);
+            log.error("Ошибка во время обработки событий от датчиков", e);
         } finally {
             try {
                 client.getProducer().flush();
@@ -101,7 +100,7 @@ public class SensorSnapshotAggregator {
         if (count % 10 == 0) {
             consumer.commitAsync(currentOffsets, (offsets, exception) -> {
                 if (exception != null) {
-                    log.warn("Error while committing offsets: {}", offsets, exception);
+                    log.warn("Ошибка во время фиксации оффсетов: {}", offsets, exception);
                 }
             });
         }

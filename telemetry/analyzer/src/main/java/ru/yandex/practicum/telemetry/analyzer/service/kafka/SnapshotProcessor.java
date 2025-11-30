@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.VoidDeserializer;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
@@ -22,7 +23,7 @@ public class SnapshotProcessor implements Runnable {
     private static final Duration POLL_TIMEOUT = Duration.ofMillis(100);
 
     private volatile boolean running = true;
-    private KafkaConsumer<Void, SensorsSnapshotAvro> consumer;
+    private KafkaConsumer<String, SensorsSnapshotAvro> consumer;
 
     private final SnapshotHandleService snapshotHandleService;
 
@@ -35,17 +36,16 @@ public class SnapshotProcessor implements Runnable {
 
     @Override
     public void run() {
-        consumer = new KafkaConsumer<>(createConsumerProperties());
+        consumer = new KafkaConsumer<>(getConsumerProperties());
         consumer.subscribe(List.of("telemetry.snapshots.v1"));
 
         try {
             while (running) {
-                ConsumerRecords<Void, SensorsSnapshotAvro> records = consumer.poll(POLL_TIMEOUT);
+                ConsumerRecords<String, SensorsSnapshotAvro> records = consumer.poll(POLL_TIMEOUT);
 
-                for (ConsumerRecord<Void, SensorsSnapshotAvro> record : records) {
+                for (ConsumerRecord<String, SensorsSnapshotAvro> record : records) {
                     snapshotHandleService.handleRecord(record.value());
                 }
-
                 consumer.commitSync();
             }
         } catch (WakeupException e) {
@@ -65,16 +65,14 @@ public class SnapshotProcessor implements Runnable {
         }
     }
 
-    private Properties createConsumerProperties() {
-        Properties props = new Properties();
-        props.put(ConsumerConfig.CLIENT_ID_CONFIG, "analyzer-snapshot-consumer");
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "consumer-client-snapshot");
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                VoidDeserializer.class.getCanonicalName());
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                SnapshotEventDeserializer.class.getCanonicalName());
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        return props;
+    private static Properties getConsumerProperties() {
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.CLIENT_ID_CONFIG, "SnapshotConsumer");
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, "consumer-client-snapshot");
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getCanonicalName());
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, SnapshotEventDeserializer.class.getCanonicalName());
+        return properties;
     }
 }
