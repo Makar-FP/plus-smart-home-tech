@@ -1,0 +1,22 @@
+aggregator:
+  kafka:
+    bootstrap-servers: "localhost:9092"
+    producer:
+      properties:
+        "bootstrap.servers": ${aggregator.kafka.bootstrap-servers}
+        "key.serializer": "org.apache.kafka.common.serialization.StringSerializer"
+        "value.serializer": "ru.yandex.practicum.telemetry.aggregator.config.EventAvroSerializer"
+      topic: "telemetry.snapshots.v1"
+
+    consumer:
+      properties:
+        "bootstrap.servers": ${aggregator.kafka.bootstrap-servers}
+        "enable.auto.commit": false
+        "group.id": "telemetry.aggregator.sensors"
+        "key.deserializer": "org.apache.kafka.common.serialization.StringDeserializer"
+        "value.deserializer": "ru.yandex.practicum.telemetry.aggregator.config.SensorEventDeserializer"
+      topic: "telemetry.sensors.v1"
+      poll-timeout: 100ms
+
+server:
+  port: 8081
