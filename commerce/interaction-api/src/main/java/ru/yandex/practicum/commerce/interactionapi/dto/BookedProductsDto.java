@@ -5,15 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder(toBuilder = true)
 @AllArgsConstructor
 @NoArgsConstructor
 public class BookedProductsDto {
 
-    private Double deliveryWeight;
+    private BigDecimal deliveryWeight;
 
-    private Double deliveryVolume;
+    private BigDecimal deliveryVolume;
 
     private boolean fragile;
 }

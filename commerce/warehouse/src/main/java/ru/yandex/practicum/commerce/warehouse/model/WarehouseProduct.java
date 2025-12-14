@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -19,16 +20,16 @@ public class WarehouseProduct {
     private UUID id;
 
     @Column(nullable = false)
-    private Double weight;
+    private BigDecimal weight;
 
     @Column(nullable = false)
-    private Double depth;
+    private BigDecimal depth;
 
     @Column(nullable = false)
-    private Double height;
+    private BigDecimal height;
 
     @Column(nullable = false)
-    private Double width;
+    private BigDecimal width;
 
     @Column(nullable = false)
     private boolean fragile;

@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -15,7 +16,7 @@ public class NewProductInWarehouseRequest {
 
     private UUID productId;
 
-    private Double weight;
+    private BigDecimal weight;
 
     private boolean fragile;
 

@@ -14,19 +14,18 @@ import ru.yandex.practicum.commerce.warehouse.mapper.WarehouseMapper;
 import ru.yandex.practicum.commerce.warehouse.model.WarehouseProduct;
 import ru.yandex.practicum.commerce.warehouse.repo.WarehouseRepository;
 
+import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class WarehouseServiceImpl implements WarehouseService {
 
-    private static final String[] ADDRESSES = new String[]{"ADDRESS_1", "ADDRESS_2"};
+    private static final String[] ADDRESSES = {"ADDRESS_1", "ADDRESS_2"};
     private static final String CURRENT_ADDRESS =
-            ADDRESSES[Random.from(new SecureRandom()).nextInt(0, 1)];
+            ADDRESSES[new SecureRandom().nextInt(ADDRESSES.length)];
 
     private final WarehouseRepository warehouseRepository;
     private final WarehouseMapper mapper;
@@ -43,9 +42,11 @@ public class WarehouseServiceImpl implements WarehouseService {
         WarehouseProduct product = warehouseRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(request.getProductId()));
 
-        product.setQuantity(request.getQuantity());
-        WarehouseProduct updatedProduct = warehouseRepository.save(product);
+        long current = product.getQuantity() == null ? 0L : product.getQuantity();
+        long toAdd = request.getQuantity() == null ? 0L : request.getQuantity();
+        product.setQuantity(current + toAdd);
 
+        WarehouseProduct updatedProduct = warehouseRepository.save(product);
         return mapper.toWarehouseDto(updatedProduct);
     }
 
@@ -56,34 +57,35 @@ public class WarehouseServiceImpl implements WarehouseService {
 
     @Override
     public BookedProductsDto checkProductQuantityEnoughForShoppingCart(ShoppingCartDto request) {
-        Double weight = 0D;
-        Double volume = 0D;
+        BigDecimal weight = BigDecimal.ZERO;
+        BigDecimal volume = BigDecimal.ZERO;
         boolean fragile = false;
 
-        Map<UUID, Long> products = request.getProducts();
-
-        for (Map.Entry<UUID, Long> entry : products.entrySet()) {
+        for (Map.Entry<UUID, Long> entry : request.getProducts().entrySet()) {
             UUID productId = entry.getKey();
-            Long cartQuantity = entry.getValue();
+            long cartQuantity = entry.getValue();
 
-            Optional<WarehouseProduct> optionalProduct = warehouseRepository.findById(productId);
-            if (optionalProduct.isEmpty()) {
-                throw new NoSpecifiedProductInWarehouseException(productId);
-            }
+            WarehouseProduct product = warehouseRepository.findById(productId)
+                    .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(productId));
 
-            WarehouseProduct product = optionalProduct.get();
-            Long warehouseQuantity = product.getQuantity();
-
+            long warehouseQuantity = product.getQuantity();
             if (warehouseQuantity < cartQuantity) {
                 throw new ProductInShoppingCartLowQuantityInWarehouse(productId);
             }
 
-            weight += product.getWeight() * cartQuantity;
-            volume += product.getDepth() * product.getWidth() * product.getHeight() * cartQuantity;
-            fragile = fragile || product.isFragile();
+            BigDecimal qty = BigDecimal.valueOf(cartQuantity);
+
+            weight = weight.add(product.getWeight().multiply(qty));
+
+            BigDecimal itemVolume = product.getDepth()
+                    .multiply(product.getWidth())
+                    .multiply(product.getHeight());
+
+            volume = volume.add(itemVolume.multiply(qty));
+
+            fragile |= product.isFragile();
         }
 
         return new BookedProductsDto(weight, volume, fragile);
     }
 }
-
