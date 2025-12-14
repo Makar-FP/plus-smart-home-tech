@@ -1,9 +1,11 @@
 package ru.yandex.practicum.commerce.interactionapi.operation;
 
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import ru.yandex.practicum.commerce.interactionapi.dto.*;
 
-@RequestMapping("/api/v1/warehouse")
 public interface WarehouseOperation {
 
     @PutMapping

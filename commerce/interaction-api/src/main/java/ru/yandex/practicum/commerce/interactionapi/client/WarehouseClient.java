@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import ru.yandex.practicum.commerce.interactionapi.dto.*;
 import ru.yandex.practicum.commerce.interactionapi.operation.WarehouseOperation;
 
-@FeignClient(name = "warehouse")
+@FeignClient(name = "warehouse", path = "/api/v1/warehouse")
 public interface WarehouseClient extends WarehouseOperation {
 
     @PutMapping("/api/v1/warehouse")
