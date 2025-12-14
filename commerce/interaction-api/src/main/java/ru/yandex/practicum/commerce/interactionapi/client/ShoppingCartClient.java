@@ -4,13 +4,14 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.commerce.interactionapi.dto.ChangeProductQuantityRequest;
 import ru.yandex.practicum.commerce.interactionapi.dto.ShoppingCartDto;
+import ru.yandex.practicum.commerce.interactionapi.operation.ShoppingCartOperation;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @FeignClient(name = "shopping-cart")
-public interface ShoppingCartClient {
+public interface ShoppingCartClient extends ShoppingCartOperation {
 
     @GetMapping("/api/v1/shopping-cart")
     ShoppingCartDto getShoppingCart(@RequestParam(required = true) String username);

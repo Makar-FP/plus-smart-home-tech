@@ -8,11 +8,12 @@ import ru.yandex.practicum.commerce.interactionapi.dto.PageDto;
 import ru.yandex.practicum.commerce.interactionapi.dto.ProductCategory;
 import ru.yandex.practicum.commerce.interactionapi.dto.ProductDto;
 import ru.yandex.practicum.commerce.interactionapi.dto.ProductQuantityState;
+import ru.yandex.practicum.commerce.interactionapi.operation.ShoppingStoreOperation;
 
 import java.util.UUID;
 
 @FeignClient(name = "shopping-store")
-public interface ShoppingStoreClient {
+public interface ShoppingStoreClient extends ShoppingStoreOperation {
 
     @PutMapping("/api/v1/shopping-store")
     ProductDto createNewProduct(@RequestBody ProductDto product);

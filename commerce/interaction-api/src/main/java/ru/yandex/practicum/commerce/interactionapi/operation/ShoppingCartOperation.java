@@ -8,20 +8,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@RequestMapping("/api/v1/shopping-cart")
 public interface ShoppingCartOperation {
 
     @GetMapping
-    ShoppingCartDto getShoppingCart(@RequestParam(required = true) String username);
+    ShoppingCartDto getShoppingCart(@RequestParam String username);
 
     @PutMapping
-    ShoppingCartDto addProductToShoppingCart(@RequestParam(required = true) String username, @RequestBody Map<UUID, Long> products);
+    ShoppingCartDto addProductToShoppingCart(@RequestParam String username,
+                                             @RequestBody Map<UUID, Long> products);
 
     @PostMapping("/change-quantity")
-    ShoppingCartDto changeProductQuantity(@RequestParam(required = true) String username, @RequestBody ChangeProductQuantityRequest request);
+    ShoppingCartDto changeProductQuantity(@RequestParam String username,
+                                          @RequestBody ChangeProductQuantityRequest request);
 
     @PostMapping("/remove")
-    ShoppingCartDto removeFromShoppingCart(@RequestParam(required = true) String username, @RequestBody List<UUID> productIds);
+    ShoppingCartDto removeFromShoppingCart(@RequestParam String username,
+                                           @RequestBody List<UUID> productIds);
 
     @DeleteMapping
-    boolean deactivateCurrentShoppingCart(@RequestParam(required = true) String username);
+    boolean deactivateCurrentShoppingCart(@RequestParam String username);
 }
