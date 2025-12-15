@@ -26,7 +26,10 @@ public class WarehouseMapper {
     }
 
     public WarehouseDto toWarehouseDto(WarehouseProduct product) {
-        DimensionDto dimension = toDimensionDto(product);
+        DimensionDto dimension = new DimensionDto();
+        dimension.setWidth(product.getWidth());
+        dimension.setHeight(product.getHeight());
+        dimension.setDepth(product.getDepth());
 
         return new WarehouseDto(
                 product.getId(),
@@ -34,14 +37,6 @@ public class WarehouseMapper {
                 dimension,
                 product.isFragile()
         );
-    }
-
-    private DimensionDto toDimensionDto(WarehouseProduct product) {
-        DimensionDto dimension = new DimensionDto();
-        dimension.setDepth(product.getDepth());
-        dimension.setHeight(product.getHeight());
-        dimension.setWidth(product.getWidth());
-        return dimension;
     }
 
     public AddressDto toAddressDto(String rawAddress) {

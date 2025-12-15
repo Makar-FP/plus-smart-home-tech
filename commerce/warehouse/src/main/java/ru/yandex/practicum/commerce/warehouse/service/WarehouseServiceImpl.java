@@ -2,12 +2,7 @@ package ru.yandex.practicum.commerce.warehouse.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.commerce.interactionapi.dto.AddProductToWarehouseRequest;
-import ru.yandex.practicum.commerce.interactionapi.dto.AddressDto;
-import ru.yandex.practicum.commerce.interactionapi.dto.BookedProductsDto;
-import ru.yandex.practicum.commerce.interactionapi.dto.NewProductInWarehouseRequest;
-import ru.yandex.practicum.commerce.interactionapi.dto.ShoppingCartDto;
-import ru.yandex.practicum.commerce.interactionapi.dto.WarehouseDto;
+import ru.yandex.practicum.commerce.interactionapi.dto.*;
 import ru.yandex.practicum.commerce.interactionapi.exception.NoSpecifiedProductInWarehouseException;
 import ru.yandex.practicum.commerce.interactionapi.exception.ProductInShoppingCartLowQuantityInWarehouse;
 import ru.yandex.practicum.commerce.warehouse.mapper.WarehouseMapper;
@@ -33,8 +28,8 @@ public class WarehouseServiceImpl implements WarehouseService {
     @Override
     public WarehouseDto newProductInWarehouse(NewProductInWarehouseRequest request) {
         WarehouseProduct product = mapper.toProduct(request);
-        WarehouseProduct savedProduct = warehouseRepository.save(product);
-        return mapper.toWarehouseDto(savedProduct);
+        product = warehouseRepository.save(product);
+        return mapper.toWarehouseDto(product);
     }
 
     @Override
@@ -42,12 +37,10 @@ public class WarehouseServiceImpl implements WarehouseService {
         WarehouseProduct product = warehouseRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(request.getProductId()));
 
-        long current = product.getQuantity() == null ? 0L : product.getQuantity();
-        long toAdd = request.getQuantity() == null ? 0L : request.getQuantity();
-        product.setQuantity(current + toAdd);
+        product.setQuantity(request.getQuantity());
 
-        WarehouseProduct updatedProduct = warehouseRepository.save(product);
-        return mapper.toWarehouseDto(updatedProduct);
+        WarehouseProduct saved = warehouseRepository.save(product);
+        return mapper.toWarehouseDto(saved);
     }
 
     @Override
@@ -57,35 +50,43 @@ public class WarehouseServiceImpl implements WarehouseService {
 
     @Override
     public BookedProductsDto checkProductQuantityEnoughForShoppingCart(ShoppingCartDto request) {
-        BigDecimal weight = BigDecimal.ZERO;
-        BigDecimal volume = BigDecimal.ZERO;
+        BigDecimal totalWeight = BigDecimal.ZERO;
+        BigDecimal totalVolume = BigDecimal.ZERO;
         boolean fragile = false;
 
         for (Map.Entry<UUID, Long> entry : request.getProducts().entrySet()) {
             UUID productId = entry.getKey();
-            long cartQuantity = entry.getValue();
+            long cartQty = nvl(entry.getValue());
 
             WarehouseProduct product = warehouseRepository.findById(productId)
                     .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(productId));
 
-            long warehouseQuantity = product.getQuantity();
-            if (warehouseQuantity < cartQuantity) {
+            long warehouseQty = nvl(product.getQuantity());
+            if (warehouseQty < cartQty) {
                 throw new ProductInShoppingCartLowQuantityInWarehouse(productId);
             }
 
-            BigDecimal qty = BigDecimal.valueOf(cartQuantity);
+            BigDecimal qty = BigDecimal.valueOf(cartQty);
 
-            weight = weight.add(product.getWeight().multiply(qty));
+            totalWeight = totalWeight.add(nvl(product.getWeight()).multiply(qty));
 
-            BigDecimal itemVolume = product.getDepth()
-                    .multiply(product.getWidth())
-                    .multiply(product.getHeight());
+            BigDecimal oneItemVolume = nvl(product.getDepth())
+                    .multiply(nvl(product.getWidth()))
+                    .multiply(nvl(product.getHeight()));
 
-            volume = volume.add(itemVolume.multiply(qty));
+            totalVolume = totalVolume.add(oneItemVolume.multiply(qty));
 
-            fragile |= product.isFragile();
+            fragile = fragile || product.isFragile();
         }
 
-        return new BookedProductsDto(weight, volume, fragile);
+        return new BookedProductsDto(totalWeight, totalVolume, fragile);
+    }
+
+    private static BigDecimal nvl(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
+    }
+
+    private static long nvl(Long v) {
+        return v == null ? 0L : v;
     }
 }
