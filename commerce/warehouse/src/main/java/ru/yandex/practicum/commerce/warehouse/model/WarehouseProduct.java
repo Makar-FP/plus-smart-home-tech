@@ -1,9 +1,9 @@
 package ru.yandex.practicum.commerce.warehouse.model;
 
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -20,21 +20,20 @@ public class WarehouseProduct {
     private UUID id;
 
     @Column(nullable = false)
-    private BigDecimal weight;
+    private BigDecimal weight = BigDecimal.ZERO;
 
     @Column(nullable = false)
-    private BigDecimal depth;
+    private BigDecimal depth = BigDecimal.ZERO;
 
     @Column(nullable = false)
-    private BigDecimal height;
+    private BigDecimal height = BigDecimal.ZERO;
 
     @Column(nullable = false)
-    private BigDecimal width;
+    private BigDecimal width = BigDecimal.ZERO;
 
     @Column(nullable = false)
     private boolean fragile;
 
     @Column(nullable = false)
     private Long quantity = 0L;
-
 }

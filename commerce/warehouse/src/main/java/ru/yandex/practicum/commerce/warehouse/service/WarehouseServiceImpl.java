@@ -2,6 +2,7 @@ package ru.yandex.practicum.commerce.warehouse.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.commerce.interactionapi.dto.*;
 import ru.yandex.practicum.commerce.interactionapi.exception.NoSpecifiedProductInWarehouseException;
 import ru.yandex.practicum.commerce.interactionapi.exception.ProductInShoppingCartLowQuantityInWarehouse;
@@ -18,18 +19,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WarehouseServiceImpl implements WarehouseService {
 
-    private static final String[] ADDRESSES = {
-            "ADDRESS_1",
-            "ADDRESS_2"
+    private static final AddressDto[] ADDRESSES = {
+            new AddressDto("Russia", "Moscow", "Tverskaya", "1", "1"),
+            new AddressDto("Russia", "Saint Petersburg", "Nevsky", "10", "25")
     };
-
-    private static final String CURRENT_ADDRESS =
+    private static final AddressDto CURRENT_ADDRESS =
             ADDRESSES[new SecureRandom().nextInt(ADDRESSES.length)];
 
     private final WarehouseRepository warehouseRepository;
     private final WarehouseMapper mapper;
 
     @Override
+    @Transactional
     public WarehouseDto newProductInWarehouse(NewProductInWarehouseRequest request) {
         WarehouseProduct product = mapper.toProduct(request);
         WarehouseProduct saved = warehouseRepository.save(product);
@@ -37,18 +38,15 @@ public class WarehouseServiceImpl implements WarehouseService {
     }
 
     @Override
+    @Transactional
     public WarehouseDto addProductToWarehouse(AddProductToWarehouseRequest request) {
         WarehouseProduct product = warehouseRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(request.getProductId()));
 
+        long addQty = nvl(request.getQuantity());
         long current = nvl(product.getQuantity());
-        long add = nvl(request.getQuantity());
 
-        if (add > 0) {
-            product.setQuantity(current + add);
-        } else {
-            product.setQuantity(current);
-        }
+        product.setQuantity(current + addQty);
 
         WarehouseProduct saved = warehouseRepository.save(product);
         return mapper.toWarehouseDto(saved);
@@ -56,24 +54,22 @@ public class WarehouseServiceImpl implements WarehouseService {
 
     @Override
     public AddressDto getWarehouseAddress() {
-        return mapper.toAddressDto(CURRENT_ADDRESS);
+        return CURRENT_ADDRESS;
     }
 
     @Override
     public BookedProductsDto checkProductQuantityEnoughForShoppingCart(ShoppingCartDto request) {
+        if (request == null || request.getProducts() == null || request.getProducts().isEmpty()) {
+            return new BookedProductsDto(BigDecimal.ZERO, BigDecimal.ZERO, false);
+        }
+
         BigDecimal totalWeight = BigDecimal.ZERO;
         BigDecimal totalVolume = BigDecimal.ZERO;
         boolean fragile = false;
 
-        Map<UUID, Long> products = (request.getProducts() == null) ? Map.of() : request.getProducts();
-
-        for (Map.Entry<UUID, Long> entry : products.entrySet()) {
+        for (Map.Entry<UUID, Long> entry : request.getProducts().entrySet()) {
             UUID productId = entry.getKey();
             long cartQty = nvl(entry.getValue());
-
-            if (cartQty <= 0) {
-                continue;
-            }
 
             WarehouseProduct product = warehouseRepository.findById(productId)
                     .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(productId));
