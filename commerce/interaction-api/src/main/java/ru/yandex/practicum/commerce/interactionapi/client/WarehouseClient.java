@@ -6,10 +6,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import ru.yandex.practicum.commerce.interactionapi.dto.*;
-import ru.yandex.practicum.commerce.interactionapi.operation.WarehouseOperation;
 
-@FeignClient(name = "warehouse", path = "/api/v1/warehouse")
-public interface WarehouseClient extends WarehouseOperation {
+@FeignClient(name = "warehouse")
+public interface WarehouseClient {
 
     @PutMapping("/api/v1/warehouse")
     WarehouseDto newProductInWarehouse(@RequestBody NewProductInWarehouseRequest request);

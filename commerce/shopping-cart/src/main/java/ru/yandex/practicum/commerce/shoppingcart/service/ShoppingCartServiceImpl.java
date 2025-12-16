@@ -4,9 +4,9 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.commerce.interactionapi.client.WarehouseClient;
-import ru.yandex.practicum.commerce.interactionapi.dto.BookedProductsDto;
 import ru.yandex.practicum.commerce.interactionapi.dto.ChangeProductQuantityRequest;
 import ru.yandex.practicum.commerce.interactionapi.dto.ShoppingCartDto;
+import ru.yandex.practicum.commerce.interactionapi.exception.NoProductsInShoppingCartException;
 import ru.yandex.practicum.commerce.interactionapi.exception.ProductNotFoundException;
 import ru.yandex.practicum.commerce.shoppingcart.mapper.ShoppingCartMapper;
 import ru.yandex.practicum.commerce.shoppingcart.model.ShoppingCart;
@@ -25,81 +25,45 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
 
     @Override
     public ShoppingCartDto getShoppingCart(String username) {
-        List<ShoppingCart> items = shoppingCartRepository.findByUsername(username)
-                .orElseGet(List::of);
-
+        List<ShoppingCart> items = shoppingCartRepository.findByUsername(username).orElse(List.of());
         if (items.isEmpty()) {
-            return new ShoppingCartDto(cartIdForUsername(username), username, Map.of());
+            throw new NoProductsInShoppingCartException(username);
         }
-
         return mapper.toShoppingCartDto(items);
     }
 
     @Override
     @Transactional
-    public ShoppingCartDto addProductToShoppingCart(String username, Map<UUID, Long> productsToAdd) {
-        if (productsToAdd == null || productsToAdd.isEmpty()) {
-            return getShoppingCart(username);
-        }
+    public ShoppingCartDto addProductToShoppingCart(String username, Map<UUID, Long> products) {
 
-        List<ShoppingCart> existing = shoppingCartRepository.findByUsername(username)
-                .orElseGet(List::of);
+        List<ShoppingCart> existing = shoppingCartRepository.findByUsername(username).orElse(List.of());
 
         UUID cartId = existing.isEmpty()
-                ? cartIdForUsername(username)
+                ? UUID.randomUUID()
                 : existing.getFirst().getShoppingCartId();
 
-        Map<UUID, Long> merged = new HashMap<>();
-        for (ShoppingCart row : existing) {
-            merged.put(row.getProductId(), nvl(row.getQuantity()));
-        }
+        ShoppingCartDto cartToCheck = new ShoppingCartDto(cartId, username, products);
+        warehouseClient.checkProductQuantityEnoughForShoppingCart(cartToCheck);
 
-        for (Map.Entry<UUID, Long> e : productsToAdd.entrySet()) {
-            UUID productId = e.getKey();
-            long addQty = nvl(e.getValue());
-            if (addQty <= 0) continue;
-
-            merged.merge(productId, addQty, Long::sum);
-        }
-
-        ShoppingCartDto cartToCheck = new ShoppingCartDto(cartId, username, merged);
-
-        BookedProductsDto ignored = warehouseClient.checkProductQuantityEnoughForShoppingCart(cartToCheck);
-
-        for (Map.Entry<UUID, Long> e : merged.entrySet()) {
-            UUID productId = e.getKey();
-            long qty = nvl(e.getValue());
-
-            ShoppingCart row = shoppingCartRepository.findByUsernameAndProductId(username, productId)
-                    .orElseGet(ShoppingCart::new);
-
+        for (Map.Entry<UUID, Long> entry : products.entrySet()) {
+            ShoppingCart row = new ShoppingCart();
             row.setShoppingCartId(cartId);
             row.setUsername(username);
-            row.setProductId(productId);
-            row.setQuantity(qty);
-
+            row.setProductId(entry.getKey());
+            row.setQuantity(entry.getValue());
             shoppingCartRepository.save(row);
         }
 
-        return new ShoppingCartDto(cartId, username, merged);
+        return new ShoppingCartDto(cartId, username, products);
     }
 
     @Override
-    @Transactional
     public ShoppingCartDto changeProductQuantity(String username, ChangeProductQuantityRequest request) {
-        UUID productId = request.getProductId();
-        long newQty = nvl(request.getNewQuantity());
+        ShoppingCart cart = shoppingCartRepository.findByProductId(request.getProductId())
+                .orElseThrow(() -> new ProductNotFoundException(request.getProductId()));
 
-        ShoppingCart row = shoppingCartRepository.findByUsernameAndProductId(username, productId)
-                .orElseThrow(() -> new ProductNotFoundException(productId));
-
-        if (newQty <= 0) {
-            shoppingCartRepository.delete(row);
-            return getShoppingCart(username);
-        }
-
-        row.setQuantity(newQty);
-        shoppingCartRepository.save(row);
+        cart.setQuantity(request.getNewQuantity());
+        shoppingCartRepository.save(cart);
 
         return getShoppingCart(username);
     }
@@ -107,36 +71,33 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
     @Override
     @Transactional
     public ShoppingCartDto removeFromShoppingCart(String username, List<UUID> productIds) {
-        if (productIds == null || productIds.isEmpty()) {
-            return getShoppingCart(username);
-        }
+
+        UUID shoppingCartId = null;
 
         for (UUID productId : productIds) {
-            ShoppingCart row = shoppingCartRepository.findByUsernameAndProductId(username, productId)
+            ShoppingCart cart = shoppingCartRepository.findByUsernameAndProductId(username, productId)
                     .orElseThrow(() -> new ProductNotFoundException(productId));
-            shoppingCartRepository.delete(row);
+
+            shoppingCartId = cart.getShoppingCartId();
+            shoppingCartRepository.delete(cart);
         }
 
-        return getShoppingCart(username);
+        List<ShoppingCart> left = shoppingCartRepository.findByShoppingCartId(shoppingCartId).orElse(List.of());
+        if (left.isEmpty()) {
+            return new ShoppingCartDto(shoppingCartId, username, Map.of());
+        }
+        return mapper.toShoppingCartDto(left);
     }
 
     @Override
-    @Transactional
     public boolean deactivateCurrentShoppingCart(String username) {
         List<ShoppingCart> items = shoppingCartRepository.findByUsername(username)
-                .orElseGet(List::of);
+                .orElseThrow(() -> new NoProductsInShoppingCartException(username));
 
-        for (ShoppingCart row : items) {
-            shoppingCartRepository.delete(row);
+        for (ShoppingCart cart : items) {
+            shoppingCartRepository.delete(cart);
         }
         return true;
     }
-
-    private static long nvl(Long v) {
-        return v == null ? 0L : v;
-    }
-
-    private static UUID cartIdForUsername(String username) {
-        return UUID.nameUUIDFromBytes(("cart:" + username).getBytes(StandardCharsets.UTF_8));
-    }
 }
+

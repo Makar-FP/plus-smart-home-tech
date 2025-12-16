@@ -16,16 +16,17 @@ import java.util.UUID;
 public class ShoppingCart {
 
     @Id
-    @Column(nullable = false, name = "id")
-    UUID shoppingCartId;
+    @Column(nullable = false, name = "shopping_cart_id")
+    private UUID shoppingCartId;
 
     @Id
     @Column(nullable = false, name = "product_id")
-    UUID productId;
+    private UUID productId;
 
     @Column(nullable = false)
-    String username;
+    private String username;
 
     @Column(nullable = false)
-    Long quantity;
+    private Long quantity;
 }
+

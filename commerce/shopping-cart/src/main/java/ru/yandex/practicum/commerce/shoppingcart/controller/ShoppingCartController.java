@@ -2,8 +2,6 @@ package ru.yandex.practicum.commerce.shoppingcart.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.commerce.interactionapi.dto.ChangeProductQuantityRequest;
@@ -22,59 +20,46 @@ import java.util.UUID;
 @RequestMapping(path = "/api/v1/shopping-cart")
 public class ShoppingCartController implements ShoppingCartOperation {
 
-    private static final String USER_HEADER = "X-Sharer-User-Id";
     private final ShoppingCartService shoppingCartService;
 
     @Override
-    public ShoppingCartDto getShoppingCart(
-            @RequestHeader(USER_HEADER) String username
-    ) throws NotAuthorizedUserException {
-        log.info("--> GET запрос c username={}", username);
+    public ShoppingCartDto getShoppingCart(String username) throws NotAuthorizedUserException {
+        log.info("--> GET username={}", username);
         ShoppingCartDto cart = shoppingCartService.getShoppingCart(username);
-        log.info("<-- GET ответ cart={}", cart);
+        log.info("<-- GET cart={}", cart);
         return cart;
     }
 
     @Override
-    public ShoppingCartDto addProductToShoppingCart(
-            @RequestHeader(USER_HEADER) String username,
-            @RequestBody Map<UUID, Long> products
-    ) throws NotAuthorizedUserException {
-        log.info("--> PUT запрос c username={} и products={}", username, products);
+    public ShoppingCartDto addProductToShoppingCart(String username, Map<UUID, Long> products)
+            throws NotAuthorizedUserException {
+        log.info("--> PUT username={} products={}", username, products);
         ShoppingCartDto cart = shoppingCartService.addProductToShoppingCart(username, products);
-        log.info("<-- PUT ответ cart={}", cart);
+        log.info("<-- PUT cart={}", cart);
         return cart;
     }
 
     @Override
-    public ShoppingCartDto changeProductQuantity(
-            @RequestHeader(USER_HEADER) String username,
-            @RequestBody ChangeProductQuantityRequest request
-    ) {
-        log.info("--> POST запрос на изменение количества продукта в корзине: {}", request);
+    public ShoppingCartDto changeProductQuantity(String username, ChangeProductQuantityRequest request) {
+        log.info("--> POST change qty: {}", request);
         ShoppingCartDto cart = shoppingCartService.changeProductQuantity(username, request);
-        log.info("<-- POST ответ cart={}", cart);
+        log.info("<-- POST cart={}", cart);
         return cart;
     }
 
     @Override
-    public ShoppingCartDto removeFromShoppingCart(
-            @RequestHeader(USER_HEADER) String username,
-            @RequestBody List<UUID> productIds
-    ) {
-        log.info("--> POST запрос на удаление продуктов из корзины: {}", productIds);
+    public ShoppingCartDto removeFromShoppingCart(String username, List<UUID> productIds) {
+        log.info("--> POST remove: {}", productIds);
         ShoppingCartDto cart = shoppingCartService.removeFromShoppingCart(username, productIds);
-        log.info("<-- POST ответ cart={}", cart);
+        log.info("<-- POST cart={}", cart);
         return cart;
     }
 
     @Override
-    public boolean deactivateCurrentShoppingCart(
-            @RequestHeader(USER_HEADER) String username
-    ) {
-        log.info("--> DELETE запрос c username={}", username);
+    public boolean deactivateCurrentShoppingCart(String username) {
+        log.info("--> DELETE username={}", username);
         boolean result = shoppingCartService.deactivateCurrentShoppingCart(username);
-        log.info("<-- DELETE ответ {} : ", result);
+        log.info("<-- DELETE result={}", result);
         return result;
     }
 }
