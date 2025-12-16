@@ -7,33 +7,37 @@ import ru.yandex.practicum.commerce.interactionapi.dto.NewProductInWarehouseRequ
 import ru.yandex.practicum.commerce.interactionapi.dto.WarehouseDto;
 import ru.yandex.practicum.commerce.warehouse.model.WarehouseProduct;
 
+import java.math.BigDecimal;
+
 @Component
 public class WarehouseMapper {
 
+    private static final BigDecimal ZERO = BigDecimal.ZERO;
+
     public WarehouseProduct toProduct(NewProductInWarehouseRequest request) {
         WarehouseProduct product = new WarehouseProduct();
+
         product.setId(request.getProductId());
         product.setFragile(request.isFragile());
-        product.setWeight(request.getWeight());
+        product.setWeight(nvl(request.getWeight()));
 
-        if (request.getDimension() != null) {
-            product.setWidth(request.getDimension().getWidth());
-            product.setHeight(request.getDimension().getHeight());
-            product.setDepth(request.getDimension().getDepth());
-        }
+        DimensionDto dim = request.getDimension();
+        product.setWidth(nvl(dim == null ? null : dim.getWidth()));
+        product.setHeight(nvl(dim == null ? null : dim.getHeight()));
+        product.setDepth(nvl(dim == null ? null : dim.getDepth()));
 
         return product;
     }
 
     public WarehouseDto toWarehouseDto(WarehouseProduct product) {
         DimensionDto dimension = new DimensionDto();
-        dimension.setWidth(product.getWidth());
-        dimension.setHeight(product.getHeight());
-        dimension.setDepth(product.getDepth());
+        dimension.setDepth(nvl(product.getDepth()));
+        dimension.setHeight(nvl(product.getHeight()));
+        dimension.setWidth(nvl(product.getWidth()));
 
         return new WarehouseDto(
                 product.getId(),
-                product.getWeight(),
+                nvl(product.getWeight()),
                 dimension,
                 product.isFragile()
         );
@@ -44,12 +48,20 @@ public class WarehouseMapper {
             return null;
         }
 
-        return new AddressDto(
-                rawAddress,
-                rawAddress,
-                rawAddress,
-                rawAddress,
-                rawAddress
-        );
+        String trimmed = rawAddress.trim();
+        if (trimmed.isEmpty()) {
+            return new AddressDto("", "", "", "", "");
+        }
+
+        String[] parts = trimmed.split("\\s*,\\s*");
+        if (parts.length == 5) {
+            return new AddressDto(parts[0], parts[1], parts[2], parts[3], parts[4]);
+        }
+
+        return new AddressDto(trimmed, trimmed, trimmed, trimmed, trimmed);
+    }
+
+    private static BigDecimal nvl(BigDecimal v) {
+        return v == null ? ZERO : v;
     }
 }

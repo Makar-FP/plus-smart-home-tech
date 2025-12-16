@@ -18,7 +18,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WarehouseServiceImpl implements WarehouseService {
 
-    private static final String[] ADDRESSES = {"ADDRESS_1", "ADDRESS_2"};
+    private static final String[] ADDRESSES = {
+            "ADDRESS_1",
+            "ADDRESS_2"
+    };
+
     private static final String CURRENT_ADDRESS =
             ADDRESSES[new SecureRandom().nextInt(ADDRESSES.length)];
 
@@ -28,8 +32,8 @@ public class WarehouseServiceImpl implements WarehouseService {
     @Override
     public WarehouseDto newProductInWarehouse(NewProductInWarehouseRequest request) {
         WarehouseProduct product = mapper.toProduct(request);
-        product = warehouseRepository.save(product);
-        return mapper.toWarehouseDto(product);
+        WarehouseProduct saved = warehouseRepository.save(product);
+        return mapper.toWarehouseDto(saved);
     }
 
     @Override
@@ -37,7 +41,14 @@ public class WarehouseServiceImpl implements WarehouseService {
         WarehouseProduct product = warehouseRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(request.getProductId()));
 
-        product.setQuantity(request.getQuantity());
+        long current = nvl(product.getQuantity());
+        long add = nvl(request.getQuantity());
+
+        if (add > 0) {
+            product.setQuantity(current + add);
+        } else {
+            product.setQuantity(current);
+        }
 
         WarehouseProduct saved = warehouseRepository.save(product);
         return mapper.toWarehouseDto(saved);
@@ -54,9 +65,15 @@ public class WarehouseServiceImpl implements WarehouseService {
         BigDecimal totalVolume = BigDecimal.ZERO;
         boolean fragile = false;
 
-        for (Map.Entry<UUID, Long> entry : request.getProducts().entrySet()) {
+        Map<UUID, Long> products = (request.getProducts() == null) ? Map.of() : request.getProducts();
+
+        for (Map.Entry<UUID, Long> entry : products.entrySet()) {
             UUID productId = entry.getKey();
             long cartQty = nvl(entry.getValue());
+
+            if (cartQty <= 0) {
+                continue;
+            }
 
             WarehouseProduct product = warehouseRepository.findById(productId)
                     .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(productId));
