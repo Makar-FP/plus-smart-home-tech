@@ -12,19 +12,28 @@ public class ShoppingCartMapper {
 
     public ShoppingCartDto toShoppingCartDto(List<ShoppingCart> items) {
         if (items == null || items.isEmpty()) {
-            return new ShoppingCartDto(null, null, Map.of());
+            return ShoppingCartDto.builder()
+                    .shoppingCartId(null)
+                    .username(null)
+                    .products(Map.of())
+                    .build();
         }
 
-        UUID cartId = items.getFirst().getShoppingCartId();
-        String username = items.getFirst().getUsername();
+        UUID cartId = items.get(0).getShoppingCartId();
+        String username = items.get(0).getUsername();
 
         Map<UUID, Long> products = items.stream()
                 .collect(Collectors.toMap(
                         ShoppingCart::getProductId,
-                        sc -> sc.getQuantity() == null ? 0L : sc.getQuantity(),
-                        Long::sum
+                        ShoppingCart::getQuantity,
+                        Long::sum // на случай дублей
                 ));
 
-        return new ShoppingCartDto(cartId, username, products);
+        return ShoppingCartDto.builder()
+                .shoppingCartId(cartId)
+                .username(username)
+                .products(products)
+                .build();
     }
 }
+
