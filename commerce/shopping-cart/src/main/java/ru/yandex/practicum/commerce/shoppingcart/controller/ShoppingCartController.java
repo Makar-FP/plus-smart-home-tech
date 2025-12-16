@@ -25,41 +25,31 @@ public class ShoppingCartController implements ShoppingCartOperation {
     @Override
     public ShoppingCartDto getShoppingCart(String username) throws NotAuthorizedUserException {
         log.info("--> GET username={}", username);
-        ShoppingCartDto cart = shoppingCartService.getShoppingCart(username);
-        log.info("<-- GET cart={}", cart);
-        return cart;
+        return shoppingCartService.getShoppingCart(username);
     }
 
     @Override
     public ShoppingCartDto addProductToShoppingCart(String username, Map<UUID, Long> products)
             throws NotAuthorizedUserException {
         log.info("--> PUT username={} products={}", username, products);
-        ShoppingCartDto cart = shoppingCartService.addProductToShoppingCart(username, products);
-        log.info("<-- PUT cart={}", cart);
-        return cart;
+        return shoppingCartService.addProductToShoppingCart(username, products);
     }
 
     @Override
     public ShoppingCartDto changeProductQuantity(String username, ChangeProductQuantityRequest request) {
-        log.info("--> POST change qty: {}", request);
-        ShoppingCartDto cart = shoppingCartService.changeProductQuantity(username, request);
-        log.info("<-- POST cart={}", cart);
-        return cart;
+        log.info("--> POST change qty request={}", request);
+        return shoppingCartService.changeProductQuantity(username, request);
     }
 
     @Override
     public ShoppingCartDto removeFromShoppingCart(String username, List<UUID> productIds) {
-        log.info("--> POST remove: {}", productIds);
-        ShoppingCartDto cart = shoppingCartService.removeFromShoppingCart(username, productIds);
-        log.info("<-- POST cart={}", cart);
-        return cart;
+        log.info("--> POST remove productIds={}", productIds);
+        return shoppingCartService.removeFromShoppingCart(username, productIds);
     }
 
     @Override
     public boolean deactivateCurrentShoppingCart(String username) {
         log.info("--> DELETE username={}", username);
-        boolean result = shoppingCartService.deactivateCurrentShoppingCart(username);
-        log.info("<-- DELETE result={}", result);
-        return result;
+        return shoppingCartService.deactivateCurrentShoppingCart(username);
     }
 }

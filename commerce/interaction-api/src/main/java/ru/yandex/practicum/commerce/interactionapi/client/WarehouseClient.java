@@ -1,10 +1,7 @@
 package ru.yandex.practicum.commerce.interactionapi.client;
 
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.commerce.interactionapi.dto.*;
 
 @FeignClient(name = "warehouse")
@@ -21,5 +18,4 @@ public interface WarehouseClient {
 
     @PostMapping("/api/v1/warehouse/check")
     BookedProductsDto checkProductQuantityEnoughForShoppingCart(@RequestBody ShoppingCartDto request);
-
 }
