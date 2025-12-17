@@ -26,7 +26,7 @@ public class ShoppingCartMapper {
                 .collect(Collectors.toMap(
                         ShoppingCart::getProductId,
                         ShoppingCart::getQuantity,
-                        Long::sum // на случай дублей
+                        Long::sum
                 ));
 
         return ShoppingCartDto.builder()

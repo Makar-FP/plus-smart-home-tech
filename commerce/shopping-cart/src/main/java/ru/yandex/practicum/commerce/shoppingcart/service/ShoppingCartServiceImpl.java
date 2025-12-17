@@ -1,8 +1,8 @@
 package ru.yandex.practicum.commerce.shoppingcart.service;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.commerce.interactionapi.client.WarehouseClient;
 import ru.yandex.practicum.commerce.interactionapi.dto.ChangeProductQuantityRequest;
 import ru.yandex.practicum.commerce.interactionapi.dto.ShoppingCartDto;
@@ -26,51 +26,38 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
     @Override
     public ShoppingCartDto getShoppingCart(String username) {
         List<ShoppingCart> items = shoppingCartRepository.findAllByUsername(username);
+
         if (items.isEmpty()) {
-            return ShoppingCartDto.builder()
-                    .shoppingCartId(null)
-                    .username(username)
-                    .products(Map.of())
-                    .build();
+            return new ShoppingCartDto(UUID.randomUUID(), username, Map.of());
         }
         return mapper.toShoppingCartDto(items);
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public ShoppingCartDto addProductToShoppingCart(String username, Map<UUID, Long> products) {
-        if (products == null || products.isEmpty()) {
-            return getShoppingCart(username);
-        }
-
         List<ShoppingCart> existing = shoppingCartRepository.findAllByUsername(username);
         UUID cartId = existing.isEmpty() ? UUID.randomUUID() : existing.get(0).getShoppingCartId();
 
-        for (Map.Entry<UUID, Long> e : products.entrySet()) {
-            UUID productId = e.getKey();
-            Long qty = e.getValue();
+        for (var entry : products.entrySet()) {
+            UUID productId = entry.getKey();
+            Long qtyObj = entry.getValue();
+            long qty = (qtyObj == null ? 0L : qtyObj);
 
-            if (productId == null || qty == null || qty <= 0) {
-                throw new IllegalArgumentException("Quantity must be > 0");
-            }
+            if (qty <= 0) continue;
 
             ShoppingCart item = shoppingCartRepository.findByUsernameAndProductId(username, productId)
-                    .orElseGet(() -> {
-                        ShoppingCart sc = new ShoppingCart();
-                        sc.setShoppingCartId(cartId);
-                        sc.setUsername(username);
-                        sc.setProductId(productId);
-                        sc.setQuantity(0L);
-                        return sc;
-                    });
+                    .orElseGet(() -> new ShoppingCart(cartId, productId, username, 0L));
 
-            item.setShoppingCartId(cartId);
             item.setQuantity(qty);
 
             shoppingCartRepository.save(item);
         }
 
-        ShoppingCartDto dto = getShoppingCart(username);
+        List<ShoppingCart> updated = shoppingCartRepository.findAllByUsername(username);
+        ShoppingCartDto dto = updated.isEmpty()
+                ? new ShoppingCartDto(cartId, username, Map.of())
+                : mapper.toShoppingCartDto(updated);
 
         warehouseClient.checkProductQuantityEnoughForShoppingCart(dto);
 
@@ -78,17 +65,13 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public ShoppingCartDto changeProductQuantity(String username, ChangeProductQuantityRequest request) {
         if (request == null || request.getProductId() == null || request.getNewQuantity() == null) {
-            throw new IllegalArgumentException("Invalid request");
-        }
-        if (request.getNewQuantity() <= 0) {
-            throw new IllegalArgumentException("newQuantity must be > 0");
+            throw new IllegalArgumentException("productId and newQuantity are required");
         }
 
-        ShoppingCart item = shoppingCartRepository
-                .findByUsernameAndProductId(username, request.getProductId())
+        ShoppingCart item = shoppingCartRepository.findByUsernameAndProductId(username, request.getProductId())
                 .orElseThrow(() -> new ProductNotFoundException(request.getProductId()));
 
         item.setQuantity(request.getNewQuantity());
@@ -98,7 +81,7 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public ShoppingCartDto removeFromShoppingCart(String username, List<UUID> productIds) {
         if (productIds == null || productIds.isEmpty()) {
             return getShoppingCart(username);
@@ -107,28 +90,26 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
         UUID cartId = null;
 
         for (UUID productId : productIds) {
-            ShoppingCart item = shoppingCartRepository
-                    .findByUsernameAndProductId(username, productId)
+            ShoppingCart item = shoppingCartRepository.findByUsernameAndProductId(username, productId)
                     .orElseThrow(() -> new ProductNotFoundException(productId));
 
             cartId = item.getShoppingCartId();
             shoppingCartRepository.delete(item);
         }
 
-        List<ShoppingCart> left = (cartId == null) ? List.of() : shoppingCartRepository.findAllByShoppingCartId(cartId);
-
-        if (left.isEmpty()) {
-            return ShoppingCartDto.builder()
-                    .shoppingCartId(cartId)
-                    .username(username)
-                    .products(Map.of())
-                    .build();
+        if (cartId == null) {
+            return new ShoppingCartDto(UUID.randomUUID(), username, Map.of());
         }
-        return mapper.toShoppingCartDto(left);
+
+        List<ShoppingCart> rest = shoppingCartRepository.findAllByShoppingCartId(cartId);
+        if (rest.isEmpty()) {
+            return new ShoppingCartDto(cartId, username, Map.of());
+        }
+        return mapper.toShoppingCartDto(rest);
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public boolean deactivateCurrentShoppingCart(String username) {
         shoppingCartRepository.deleteAllByUsername(username);
         return true;
