@@ -1,13 +1,12 @@
 package ru.yandex.practicum.commerce.shoppingcart.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.UUID;
 
-@Data
+@Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
@@ -16,8 +15,8 @@ import java.util.UUID;
 public class ShoppingCart {
 
     @Id
-    @Column(nullable = false, name = "shopping_cart_id")
-    private UUID shoppingCartId;
+    @Column(nullable = false, name = "id")
+    private UUID id;
 
     @Id
     @Column(nullable = false, name = "product_id")

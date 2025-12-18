@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.commerce.shoppingcart.model.CompositeKey;
 import ru.yandex.practicum.commerce.shoppingcart.model.ShoppingCart;
 
@@ -17,8 +18,9 @@ public interface ShoppingCartRepository extends JpaRepository<ShoppingCart, Comp
 
     Optional<ShoppingCart> findByUsernameAndProductId(String username, UUID productId);
 
-    List<ShoppingCart> findAllByShoppingCartId(UUID shoppingCartId);
+    List<ShoppingCart> findAllById(UUID id);
 
+    @Transactional
     @Modifying
     @Query("delete from ShoppingCart sc where sc.username = :username")
     int deleteAllByUsername(@Param("username") String username);

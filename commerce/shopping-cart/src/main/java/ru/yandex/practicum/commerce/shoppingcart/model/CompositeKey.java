@@ -12,7 +12,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class CompositeKey implements Serializable {
 
-    UUID shoppingCartId;
+    UUID id;
 
     UUID productId;
 }

@@ -37,7 +37,7 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
     @Transactional
     public ShoppingCartDto addProductToShoppingCart(String username, Map<UUID, Long> products) {
         List<ShoppingCart> existing = shoppingCartRepository.findAllByUsername(username);
-        UUID cartId = existing.isEmpty() ? UUID.randomUUID() : existing.get(0).getShoppingCartId();
+        UUID cartId = existing.isEmpty() ? UUID.randomUUID() : existing.get(0).getId();
 
         for (var entry : products.entrySet()) {
             UUID productId = entry.getKey();
@@ -93,7 +93,7 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
             ShoppingCart item = shoppingCartRepository.findByUsernameAndProductId(username, productId)
                     .orElseThrow(() -> new ProductNotFoundException(productId));
 
-            cartId = item.getShoppingCartId();
+            cartId = item.getId();
             shoppingCartRepository.delete(item);
         }
 
@@ -101,7 +101,7 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
             return new ShoppingCartDto(UUID.randomUUID(), username, Map.of());
         }
 
-        List<ShoppingCart> rest = shoppingCartRepository.findAllByShoppingCartId(cartId);
+        List<ShoppingCart> rest = shoppingCartRepository.findAllById(cartId);
         if (rest.isEmpty()) {
             return new ShoppingCartDto(cartId, username, Map.of());
         }

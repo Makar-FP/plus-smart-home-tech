@@ -19,7 +19,7 @@ public class ShoppingCartMapper {
                     .build();
         }
 
-        UUID cartId = items.get(0).getShoppingCartId();
+        UUID cartId = items.get(0).getId();
         String username = items.get(0).getUsername();
 
         Map<UUID, Long> products = items.stream()
