@@ -6,8 +6,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.LocalDateTime;
-
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
@@ -18,8 +16,7 @@ public class GlobalExceptionHandler {
         return new ExceptionResponse(
                 HttpStatus.NOT_FOUND.name(),
                 "The required object was not found.",
-                ex.getMessage(),
-                LocalDateTime.now()
+                ex.getMessage()
         );
     }
 
@@ -29,8 +26,7 @@ public class GlobalExceptionHandler {
         return new ExceptionResponse(
                 HttpStatus.NOT_FOUND.name(),
                 "The required object was not found.",
-                ex.getMessage(),
-                LocalDateTime.now()
+                ex.getMessage()
         );
     }
 
@@ -40,8 +36,7 @@ public class GlobalExceptionHandler {
         return new ExceptionResponse(
                 HttpStatus.NOT_FOUND.name(),
                 "The required object was not found.",
-                ex.getMessage(),
-                LocalDateTime.now()
+                ex.getMessage()
         );
     }
 
@@ -51,8 +46,7 @@ public class GlobalExceptionHandler {
         return new ExceptionResponse(
                 HttpStatus.UNAUTHORIZED.name(),
                 "User not authorized.",
-                ex.getMessage(),
-                LocalDateTime.now()
+                ex.getMessage()
         );
     }
 
@@ -64,8 +58,7 @@ public class GlobalExceptionHandler {
         return new ExceptionResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.name(),
                 "Service error.",
-                "Unexpected error. Please try again later.",
-                LocalDateTime.now()
+                "Unexpected error. Please try again later."
         );
     }
 
@@ -77,8 +70,7 @@ public class GlobalExceptionHandler {
         return new ExceptionResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.name(),
                 "Error occurred.",
-                "Unexpected error. Please try again later.",
-                LocalDateTime.now()
+                "Unexpected error. Please try again later."
         );
     }
 }

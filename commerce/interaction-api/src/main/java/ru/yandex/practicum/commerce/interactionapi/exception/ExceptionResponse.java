@@ -14,6 +14,4 @@ public class ExceptionResponse {
     private String reason;
 
     private String message;
-
-    private LocalDateTime timestamp;
 }
