@@ -6,8 +6,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.time.LocalDateTime;
 
 @RestControllerAdvice
@@ -60,34 +58,27 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CreateNewProductSericeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ExceptionResponse handleNewProductSericeException(CreateNewProductSericeException ex) {
-        log.error("500 Internal Server Error: {}", ex.getMessage(), ex);
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        ex.printStackTrace(pw);
-        String stackTrace = sw.toString();
+    public ExceptionResponse handleNewProductServiceException(CreateNewProductSericeException ex) {
+        log.error("500 Internal Server Error (CreateNewProductSericeException): {}", ex.getMessage(), ex);
+
         return new ExceptionResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.name(),
-                "SERVICE-ERROR.",
-                ex.getMessage() + "\n" + stackTrace,
+                "Service error.",
+                "Unexpected error. Please try again later.",
                 LocalDateTime.now()
         );
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ExceptionResponse handleException(final Exception e) {
-        log.error("500 Internal Server Error: {}", e.getMessage(), e);
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        e.printStackTrace(pw);
-        String stackTrace = sw.toString();
+    public ExceptionResponse handleException(Exception ex) {
+        log.error("500 Internal Server Error: {}", ex.getMessage(), ex);
+
         return new ExceptionResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.name(),
                 "Error occurred.",
-                e.getMessage() + "\n" + stackTrace,
+                "Unexpected error. Please try again later.",
                 LocalDateTime.now()
         );
     }
-
 }
