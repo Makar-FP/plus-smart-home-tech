@@ -1,0 +1,23 @@
+server:
+  port: 0
+  error:
+    include-message: always
+    include-stacktrace: always
+
+
+spring:
+  datasource:
+    initialization-mode: always
+    driverClassName: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5433/shoppingstore
+    username: shoppingstore
+    password: shoppingstore
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+  sql:
+    init:
+      mode: always
