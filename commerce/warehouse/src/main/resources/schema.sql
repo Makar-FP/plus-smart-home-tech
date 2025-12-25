@@ -7,3 +7,15 @@ CREATE TABLE IF NOT EXISTS products (
     fragile BOOLEAN NOT NULL,
     quantity BIGINT
 );
+
+CREATE TABLE IF NOT EXISTS orders_booking (
+    id UUID PRIMARY KEY,
+    delivery_id UUID
+);
+
+CREATE TABLE IF NOT EXISTS booking_products (
+    id UUID PRIMARY KEY,
+    product_id UUID,
+    order_id UUID,
+    quantity BIGINT
+);
