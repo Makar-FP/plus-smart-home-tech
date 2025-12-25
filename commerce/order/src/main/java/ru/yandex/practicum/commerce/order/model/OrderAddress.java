@@ -1,7 +1,5 @@
 package ru.yandex.practicum.commerce.order.model;
 
-package ru.yandex.practicum.commerce.order.model;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
