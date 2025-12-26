@@ -10,6 +10,68 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(SpecifiedProductAlreadyInWarehouseException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ExceptionResponse handleSpecifiedProductAlreadyInWarehouseException(SpecifiedProductAlreadyInWarehouseException ex) {
+        return new ExceptionResponse(
+                HttpStatus.BAD_REQUEST.name(),
+                "Bad request.",
+                ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(CreateNewProductException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ExceptionResponse handleNewProductCreatingException(CreateNewProductSericeException ex) {
+        log.error("500 Internal Server Error: {}", ex.getMessage(), ex);
+        return new ExceptionResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.name(),
+                "SERVICE-ERROR.",
+                ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(WarehouseServicesNotAvailableException.class)
+    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
+    public ExceptionResponse handleWarehouseServicesNotAvailableException(WarehouseServicesNotAvailableException ex) {
+        return new ExceptionResponse(
+                HttpStatus.METHOD_NOT_ALLOWED.name(),
+                "Service not available.",
+                ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(NoDeliveryFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ExceptionResponse handleNoDeliveryFoundException(NoDeliveryFoundException ex) {
+        return new ExceptionResponse(
+                HttpStatus.NOT_FOUND.name(),
+                "The required payment was not found.",
+                ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(NoPaymentFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ExceptionResponse handleNoPaymentFoundException(NoPaymentFoundException ex) {
+        return new ExceptionResponse(
+                HttpStatus.NOT_FOUND.name(),
+                "The required payment was not found.",
+                ex.getMessage()
+        );
+    }
+
+
+    @ExceptionHandler(NoOrderFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ExceptionResponse handleNoOrderFoundException(NoOrderFoundException ex) {
+        return new ExceptionResponse(
+                HttpStatus.NOT_FOUND.name(),
+                "The required order was not found.",
+                ex.getMessage()
+        );
+    }
+
     @ExceptionHandler(NoProductsInShoppingCartException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ExceptionResponse handleProductsInShoppingCartNotFound(NoProductsInShoppingCartException ex) {

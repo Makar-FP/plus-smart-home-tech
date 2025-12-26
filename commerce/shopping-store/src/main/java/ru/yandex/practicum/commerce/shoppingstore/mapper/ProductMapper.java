@@ -1,7 +1,7 @@
 package ru.yandex.practicum.commerce.shoppingstore.mapper;
 
 import org.springframework.stereotype.Component;
-import ru.yandex.practicum.commerce.interactionapi.dto.ProductDto;
+import ru.yandex.practicum.commerce.interactionapi.dto.store.ProductDto;
 import ru.yandex.practicum.commerce.shoppingstore.model.Product;
 
 import java.util.UUID;

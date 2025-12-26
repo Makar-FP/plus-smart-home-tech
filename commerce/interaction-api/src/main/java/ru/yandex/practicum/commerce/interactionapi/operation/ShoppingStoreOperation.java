@@ -3,10 +3,10 @@ package ru.yandex.practicum.commerce.interactionapi.operation;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.commerce.interactionapi.dto.PageDto;
-import ru.yandex.practicum.commerce.interactionapi.dto.ProductCategory;
-import ru.yandex.practicum.commerce.interactionapi.dto.ProductDto;
-import ru.yandex.practicum.commerce.interactionapi.dto.ProductQuantityState;
+import ru.yandex.practicum.commerce.interactionapi.dto.common.PageDto;
+import ru.yandex.practicum.commerce.interactionapi.dto.common.ProductCategory;
+import ru.yandex.practicum.commerce.interactionapi.dto.store.ProductDto;
+import ru.yandex.practicum.commerce.interactionapi.dto.common.ProductQuantityState;
 
 import java.util.UUID;
 

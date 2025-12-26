@@ -1,6 +1,6 @@
 package ru.yandex.practicum.commerce.interactionapi.exception;
 
-import ru.yandex.practicum.commerce.interactionapi.dto.ProductDto;
+import ru.yandex.practicum.commerce.interactionapi.dto.store.ProductDto;
 
 public class CreateNewProductSericeException extends RuntimeException {
     public CreateNewProductSericeException(ProductDto product) {
